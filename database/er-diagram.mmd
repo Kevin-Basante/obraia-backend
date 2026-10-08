@@ -1,0 +1,342 @@
+erDiagram
+  users ||--o{ user_roles : has
+  roles ||--o{ user_roles : assigned_to
+  roles ||--o{ role_permissions : grants
+  permissions ||--o{ role_permissions : included_in
+  users ||--o{ refresh_tokens : owns
+  users ||--o{ password_reset_tokens : requests
+  users ||--o{ email_verification_tokens : verifies_with
+  users ||--o{ deletion_requests : confirms
+  users |o--o{ auth_audit_logs : generates
+
+  users {
+    uuid id PK
+    varchar email UK
+    varchar password_hash
+    varchar first_name
+    varchar last_name
+    varchar phone
+    timestamptz email_verified_at
+    boolean is_active
+    timestamptz last_login_at
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  roles {
+    uuid id PK
+    varchar name UK
+    varchar scope "platform | project"
+    varchar description
+    timestamptz created_at
+  }
+  permissions {
+    uuid id PK
+    varchar code UK
+    varchar description
+    timestamptz created_at
+  }
+  role_permissions {
+    uuid role_id PK, FK
+    uuid permission_id PK, FK
+  }
+  user_roles {
+    uuid user_id PK, FK
+    uuid role_id PK, FK
+    timestamptz assigned_at
+  }
+  refresh_tokens {
+    uuid id PK
+    uuid user_id FK
+    varchar token_hash UK
+    timestamptz expires_at
+    timestamptz revoked_at
+    timestamptz created_at
+  }
+  password_reset_tokens {
+    uuid id PK
+    uuid user_id FK
+    varchar token_hash UK
+    timestamptz expires_at
+    timestamptz used_at
+    timestamptz created_at
+  }
+  email_verification_tokens {
+    uuid id PK
+    uuid user_id FK
+    varchar token_hash UK
+    timestamptz expires_at
+    timestamptz used_at
+    timestamptz created_at
+  }
+  deletion_requests {
+    uuid id PK
+    uuid user_id FK
+    varchar target_type "account | project"
+    uuid target_id
+    varchar token_hash UK
+    timestamptz expires_at
+    timestamptz confirmed_at
+    timestamptz created_at
+  }
+  auth_audit_logs {
+    uuid id PK
+    uuid user_id FK "nullable"
+    varchar attempted_email
+    varchar event_type
+    varchar ip_address
+    varchar user_agent
+    timestamptz created_at
+  }
+
+  users ||--o{ project_members : participates_in
+  roles ||--o{ project_members : defines_role
+  projects ||--o{ project_members : has
+  users ||--o{ companies : registers
+  companies |o--o{ projects : owns
+  project_types ||--o{ projects : classifies
+  locations ||--o{ projects : located_in
+  users ||--o{ site_managers : registers
+  site_managers |o--o{ projects : leads
+  project_types ||--o{ phase_templates : defines
+  phase_templates |o--o{ phases : copied_into
+  projects ||--o{ phases : has
+  phases ||--o{ tasks : contains
+  tasks ||--o{ progress_reports : tracked_by
+  users ||--o{ progress_reports : records
+  site_managers |o--o{ progress_reports : informs
+  projects ||--o{ budgets : has
+  budgets ||--o{ budget_items : breaks_down_into
+  projects ||--o{ expenses : incurs
+  phases |o--o{ expenses : charged_to
+  users ||--o{ expenses : registers
+  projects ||--o{ risk_assessments : evaluated_by
+  users ||--o{ notifications : receives
+  projects |o--o{ notifications : origin_of
+
+  companies {
+    uuid id PK
+    uuid created_by FK
+    varchar name
+    varchar tax_id UK "NIT"
+    varchar phone
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  project_types {
+    uuid id PK
+    varchar name UK
+    varchar description
+    timestamptz created_at
+  }
+  locations {
+    uuid id PK
+    varchar city
+    varchar department
+    varchar country
+    timestamptz created_at
+  }
+  projects {
+    uuid id PK
+    uuid created_by FK
+    uuid project_type_id FK
+    uuid location_id FK
+    uuid company_id FK "nullable"
+    uuid site_manager_id FK "nullable"
+    varchar name
+    varchar address
+    numeric built_area_m2
+    smallint floors "1 o 2"
+    varchar size_category "generada"
+    varchar status
+    date planned_start_date
+    date planned_end_date
+    date actual_start_date
+    date actual_end_date
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  project_members {
+    uuid project_id PK, FK
+    uuid user_id PK, FK
+    uuid role_id FK
+    timestamptz joined_at
+  }
+  site_managers {
+    uuid id PK
+    uuid created_by FK
+    varchar full_name
+    varchar document_number
+    varchar phone
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  phase_templates {
+    uuid id PK
+    uuid project_type_id FK
+    varchar size_category
+    varchar name
+    int sequence_order
+    int estimated_duration_days
+    timestamptz created_at
+  }
+  phases {
+    uuid id PK
+    uuid project_id FK
+    uuid phase_template_id FK "nullable"
+    varchar name
+    int sequence_order
+    varchar status
+    date planned_start_date
+    date planned_end_date
+    date actual_start_date
+    date actual_end_date
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  tasks {
+    uuid id PK
+    uuid phase_id FK
+    varchar name
+    varchar status
+    date planned_start_date
+    date planned_end_date
+    date actual_start_date
+    date actual_end_date
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  progress_reports {
+    uuid id PK
+    uuid task_id FK
+    uuid reported_by FK
+    uuid site_manager_id FK "nullable"
+    numeric completion_percentage
+    text notes
+    varchar photo_path
+    date report_date
+    timestamptz created_at
+  }
+  budgets {
+    uuid id PK
+    uuid project_id FK
+    int version
+    varchar status "draft | approved | superseded"
+    numeric projected_amount
+    numeric actual_amount
+    timestamptz approved_at
+    timestamptz created_at
+  }
+  budget_items {
+    uuid id PK
+    uuid budget_id FK
+    varchar item_type
+    varchar description
+    numeric amount
+    numeric percentage "nullable"
+    boolean is_percentage
+    int sequence_order
+  }
+  expenses {
+    uuid id PK
+    uuid project_id FK
+    uuid phase_id FK "nullable"
+    uuid registered_by FK
+    varchar category
+    varchar description
+    numeric amount
+    date expense_date
+    varchar receipt_path
+    timestamptz created_at
+  }
+  risk_assessments {
+    uuid id PK
+    uuid project_id FK
+    varchar risk_level
+    numeric risk_score
+    int predicted_delay_days
+    jsonb risk_factors
+    varchar model_version
+    varchar trigger_source
+    timestamptz assessed_at
+  }
+  notifications {
+    uuid id PK
+    uuid user_id FK
+    uuid project_id FK "nullable"
+    varchar type
+    text message
+    boolean is_read
+    timestamptz created_at
+  }
+
+  projects ||--o{ blueprints : has
+  users ||--o{ blueprints : uploads
+  projects ||--o{ blueprint_measurements : measured_by
+  blueprints |o--o{ blueprint_measurements : source_of
+  project_types ||--o{ material_formulas : parametrizes
+  material_catalog ||--o{ material_formulas : consumed_by
+  projects ||--o{ project_materials : requires
+  material_catalog ||--o{ project_materials : used_in
+
+  blueprints {
+    uuid id PK
+    uuid project_id FK
+    uuid uploaded_by FK
+    varchar file_path
+    varchar original_filename
+    varchar file_type "image | scanned_pdf | vector_pdf"
+    varchar mime_type
+    bigint size_bytes
+    varchar storage_provider "local | external"
+    varchar processing_status
+    jsonb ocr_raw_output
+    timestamptz uploaded_at
+  }
+  blueprint_measurements {
+    uuid id PK
+    uuid project_id FK
+    uuid blueprint_id FK "nullable"
+    varchar element_type
+    smallint floor_number
+    numeric length_m
+    numeric width_m
+    numeric height_m
+    int quantity
+    varchar source "ocr | manual"
+    numeric discrepancy_pct
+    text notes
+    timestamptz created_at
+  }
+  material_catalog {
+    uuid id PK
+    varchar name UK
+    varchar category
+    varchar unit
+    numeric reference_price "COP con IVA"
+    date price_updated_at
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  material_formulas {
+    uuid id PK
+    uuid project_type_id FK
+    uuid material_id FK
+    varchar element_type
+    numeric consumption_per_unit
+    varchar base_unit "m2 | m3 | ml"
+    numeric waste_factor
+    timestamptz created_at
+  }
+  project_materials {
+    uuid id PK
+    uuid project_id FK
+    uuid material_id FK
+    numeric calculated_quantity
+    numeric unit_price_snapshot
+    numeric subtotal
+    timestamptz created_at
+    timestamptz updated_at
+  }
