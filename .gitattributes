@@ -1,0 +1,4 @@
+# Keep consistent line endings between Windows and Linux (Render builds on Linux)
+* text=auto
+mvnw text eol=lf
+*.cmd text eol=crlf
