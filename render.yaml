@@ -1,0 +1,20 @@
+# Render Blueprint: describes the web service so it can be created from this file.
+# Secret values (sync: false) are asked for in the Render dashboard, never stored here.
+services:
+  - type: web
+    name: obraia-backend
+    runtime: docker
+    region: ohio
+    plan: free
+    branch: main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: DB_URL
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
