@@ -2,19 +2,26 @@ package com.obraia.backend.service;
 
 import java.time.Instant;
 import java.util.Locale;
+import java.util.Optional;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.obraia.backend.config.AuthProperties;
+import com.obraia.backend.dto.auth.AuthResponse;
+import com.obraia.backend.dto.auth.LoginRequest;
 import com.obraia.backend.dto.auth.MessageResponse;
 import com.obraia.backend.dto.auth.RegisterRequest;
+import com.obraia.backend.dto.user.UserResponse;
 import com.obraia.backend.entity.AuditEvent;
 import com.obraia.backend.entity.EmailVerificationToken;
 import com.obraia.backend.entity.Role;
 import com.obraia.backend.entity.User;
+import com.obraia.backend.exception.AccountDisabledException;
 import com.obraia.backend.exception.EmailAlreadyRegisteredException;
+import com.obraia.backend.exception.EmailNotVerifiedException;
+import com.obraia.backend.exception.InvalidCredentialsException;
 import com.obraia.backend.exception.InvalidTokenException;
 import com.obraia.backend.repository.EmailVerificationTokenRepository;
 import com.obraia.backend.repository.PasswordResetTokenRepository;
@@ -22,6 +29,7 @@ import com.obraia.backend.repository.RoleRepository;
 import com.obraia.backend.repository.UserRepository;
 import com.obraia.backend.security.ClientInfo;
 import com.obraia.backend.security.JwtService;
+import com.obraia.backend.security.JwtService.AccessToken;
 import com.obraia.backend.security.TokenHasher;
 
 /** Registration, email verification, sign in, sessions and password recovery. */
@@ -41,6 +49,8 @@ public class AuthService {
     private final AuthEmailService authEmailService;
     private final AuditService auditService;
     private final AuthProperties properties;
+    // Compared when the email does not exist, so the answer takes the same time.
+    private final String dummyPasswordHash;
 
     public AuthService(UserRepository userRepository, RoleRepository roleRepository,
             EmailVerificationTokenRepository verificationTokens, PasswordResetTokenRepository resetTokens,
@@ -56,6 +66,7 @@ public class AuthService {
         this.authEmailService = authEmailService;
         this.auditService = auditService;
         this.properties = properties;
+        this.dummyPasswordHash = passwordEncoder.encode("not-a-real-password-1");
     }
 
     @Transactional
@@ -102,11 +113,42 @@ public class AuthService {
         return new MessageResponse(VERIFICATION_SENT);
     }
 
+    @Transactional
+    public AuthResponse login(LoginRequest request, ClientInfo client) {
+        String email = normalizeEmail(request.email());
+        Optional<User> found = userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull(email);
+
+        String hash = found.map(User::getPasswordHash).orElse(dummyPasswordHash);
+        boolean passwordMatches = passwordEncoder.matches(request.password(), hash);
+        if (found.isEmpty() || !passwordMatches) {
+            auditService.recordFailure(AuditEvent.LOGIN_FAILED, found.map(User::getId).orElse(null), email, client);
+            throw new InvalidCredentialsException();
+        }
+
+        User user = found.get();
+        if (!user.canSignIn()) {
+            throw new AccountDisabledException();
+        }
+        if (!user.isEmailVerified()) {
+            throw new EmailNotVerifiedException();
+        }
+
+        user.setLastLoginAt(Instant.now());
+        auditService.record(AuditEvent.LOGIN_SUCCESS, user.getId(), email, client);
+        return createSession(user, refreshTokenService.issue(user));
+    }
+
     private void sendVerificationLink(User user) {
         String token = TokenHasher.generateToken();
         verificationTokens.save(new EmailVerificationToken(user, TokenHasher.hash(token),
                 Instant.now().plus(properties.verificationTokenTtl())));
         authEmailService.sendVerificationEmail(user, token);
+    }
+
+    private AuthResponse createSession(User user, String refreshToken) {
+        AccessToken accessToken = jwtService.createAccessToken(user);
+        return AuthResponse.bearer(accessToken.token(), accessToken.expiresInSeconds(), refreshToken,
+                UserResponse.from(user));
     }
 
     private static String normalizeEmail(String email) {
