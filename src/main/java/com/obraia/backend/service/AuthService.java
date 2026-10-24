@@ -13,9 +13,11 @@ import com.obraia.backend.dto.auth.AuthResponse;
 import com.obraia.backend.dto.auth.LoginRequest;
 import com.obraia.backend.dto.auth.MessageResponse;
 import com.obraia.backend.dto.auth.RegisterRequest;
+import com.obraia.backend.dto.auth.ResetPasswordRequest;
 import com.obraia.backend.dto.user.UserResponse;
 import com.obraia.backend.entity.AuditEvent;
 import com.obraia.backend.entity.EmailVerificationToken;
+import com.obraia.backend.entity.PasswordResetToken;
 import com.obraia.backend.entity.Role;
 import com.obraia.backend.entity.User;
 import com.obraia.backend.exception.AccountDisabledException;
@@ -38,6 +40,7 @@ public class AuthService {
 
     static final String VERIFICATION_SENT =
             "If the account exists and is not verified, we sent a new verification link";
+    static final String RESET_SENT = "If the account exists, we sent a link to reset the password";
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -155,6 +158,41 @@ public class AuthService {
     public void logout(String refreshToken, ClientInfo client) {
         refreshTokenService.revoke(refreshToken)
                 .ifPresent(userId -> auditService.record(AuditEvent.LOGOUT, userId, null, client));
+    }
+
+    /** Always gives the same answer, so nobody can find out which emails are registered. */
+    @Transactional
+    public MessageResponse forgotPassword(String email, ClientInfo client) {
+        userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull(normalizeEmail(email))
+                .filter(User::canSignIn)
+                .ifPresent(user -> {
+                    Instant now = Instant.now();
+                    resetTokens.invalidateUnusedByUserId(user.getId(), now);
+                    String token = TokenHasher.generateToken();
+                    resetTokens.save(new PasswordResetToken(user, TokenHasher.hash(token),
+                            now.plus(properties.passwordResetTokenTtl())));
+                    authEmailService.sendPasswordResetEmail(user, token);
+                    auditService.record(AuditEvent.PASSWORD_RESET_REQUESTED, user.getId(), user.getEmail(), client);
+                });
+        return new MessageResponse(RESET_SENT);
+    }
+
+    @Transactional
+    public MessageResponse resetPassword(ResetPasswordRequest request, ClientInfo client) {
+        Instant now = Instant.now();
+        PasswordResetToken reset = resetTokens.findByTokenHash(TokenHasher.hash(request.token()))
+                .filter(t -> t.isUsable(now))
+                .orElseThrow(InvalidTokenException::passwordResetLink);
+
+        reset.markUsed(now);
+        User user = reset.getUser();
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        // The link arrived by email, so the email is proven too.
+        user.markEmailVerified(now);
+        // Every open session must sign in again with the new password.
+        refreshTokenService.revokeAll(user.getId());
+        auditService.record(AuditEvent.PASSWORD_CHANGED, user.getId(), user.getEmail(), client);
+        return new MessageResponse("Your password was changed. Sign in with the new password.");
     }
 
     private void sendVerificationLink(User user) {
