@@ -14,6 +14,7 @@ import com.obraia.backend.dto.auth.LoginRequest;
 import com.obraia.backend.dto.auth.MessageResponse;
 import com.obraia.backend.dto.auth.RefreshTokenRequest;
 import com.obraia.backend.dto.auth.RegisterRequest;
+import com.obraia.backend.dto.auth.ResetPasswordRequest;
 import com.obraia.backend.dto.auth.TokenRequest;
 import com.obraia.backend.security.ClientInfo;
 import com.obraia.backend.service.AuthService;
@@ -95,4 +96,20 @@ public class AuthController {
         authService.logout(request.refreshToken(), ClientInfo.from(http));
     }
 
+    @PostMapping("/forgot-password")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @Operation(summary = "Send a link to reset the password")
+    @ApiResponse(responseCode = "202", description = "Same answer whether or not the email exists")
+    public MessageResponse forgotPassword(@Valid @RequestBody EmailRequest request, HttpServletRequest http) {
+        return authService.forgotPassword(request.email(), ClientInfo.from(http));
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Choose a new password with the token from the link")
+    @ApiResponse(responseCode = "200", description = "Password changed; every session is closed")
+    @ApiResponse(responseCode = "400", description = "Invalid, used or expired link, or weak password",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public MessageResponse resetPassword(@Valid @RequestBody ResetPasswordRequest request, HttpServletRequest http) {
+        return authService.resetPassword(request, ClientInfo.from(http));
+    }
 }
