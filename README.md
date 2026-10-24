@@ -9,7 +9,9 @@ El frontend solo conoce la URL de esta API.
 ## Tecnologías
 
 - Java 17 + Spring Boot 4
+- Spring Security con tokens JWT para la autenticación
 - PostgreSQL (Neon) con migraciones Flyway
+- Brevo (API HTTP) para enviar los correos de la cuenta
 - Swagger (springdoc-openapi) para la documentación
 - Docker para el despliegue en Render
 
@@ -40,7 +42,11 @@ El archivo `.env` está en `.gitignore` y **nunca** se sube a GitHub.
 | `DB_URL`       | Conexión JDBC, por ejemplo `jdbc:postgresql://localhost:5432/obraia_dev` |
 | `DB_USER`      | Usuario de la base de datos                                             |
 | `DB_PASSWORD`  | Contraseña de la base de datos                                          |
-| `FRONTEND_URL` | Orígenes del frontend permitidos (CORS), separados por comas            |
+| `FRONTEND_URL` | Orígenes del frontend permitidos (CORS), separados por comas. El primero se usa en los enlaces de los correos |
+| `JWT_SECRET`   | Clave para firmar los tokens: texto aleatorio de al menos 32 caracteres  |
+| `MAIL_PROVIDER`| `log` muestra los correos en la consola (desarrollo); `brevo` los envía   |
+| `MAIL_FROM`    | Remitente de los correos (debe estar verificado en Brevo)               |
+| `BREVO_API_KEY`| Clave de la API de Brevo (solo si `MAIL_PROVIDER=brevo`)                |
 | `PORT`         | Puerto del servidor (por defecto 8080; Render lo asigna solo)           |
 
 ## Comandos
@@ -63,7 +69,43 @@ Al arrancar, Flyway crea las tablas y carga los datos iniciales si todavía no e
 | GET    | `/api/docs`      | Documentación interactiva (Swagger)                                                      |
 | GET    | `/api/docs.json` | Documento OpenAPI en JSON                                                                |
 
+### Autenticación (públicos)
+
+| Método | Ruta                             | Qué hace                                                        |
+| ------ | -------------------------------- | --------------------------------------------------------------- |
+| POST   | `/api/auth/register`             | Crea la cuenta y envía el correo de verificación (201)          |
+| POST   | `/api/auth/verify-email`         | Confirma el correo con el token del enlace                      |
+| POST   | `/api/auth/resend-verification`  | Envía un nuevo enlace de verificación (202)                     |
+| POST   | `/api/auth/login`                | Inicia sesión y devuelve el token de acceso y el de renovación  |
+| POST   | `/api/auth/refresh`              | Entrega tokens nuevos con el token de renovación                |
+| POST   | `/api/auth/logout`               | Cierra la sesión (revoca el token de renovación) (204)          |
+| POST   | `/api/auth/forgot-password`      | Envía el enlace para cambiar la contraseña (202)                |
+| POST   | `/api/auth/reset-password`       | Cambia la contraseña con el token del enlace                    |
+
+### Usuario (requieren token)
+
+| Método | Ruta            | Qué hace                         |
+| ------ | --------------- | -------------------------------- |
+| GET    | `/api/users/me` | Datos del usuario que inició sesión |
+
+Las rutas protegidas necesitan el encabezado `Authorization: Bearer <accessToken>`.
+En Swagger se usa el botón **Authorize** con el token que devuelve el login.
+
 Los errores siempre responden en JSON con la forma `{ "error": { "code", "message" } }`.
+Los errores de validación agregan `fields` con el problema de cada campo.
+
+## Cómo funciona la autenticación
+
+1. **Registro:** la contraseña se guarda cifrada con BCrypt y se envía un enlace de verificación que vence en 24 horas.
+2. **Verificación:** el enlace abre el frontend (`/verify-email?token=...`), que llama a `/api/auth/verify-email`. Sin verificar el correo no se puede iniciar sesión.
+3. **Inicio de sesión:** devuelve un **token de acceso** (JWT, dura 15 minutos) y un **token de renovación** (dura 7 días).
+4. **Renovación:** cuando el token de acceso vence, el frontend llama a `/api/auth/refresh`. Cada token de renovación sirve una sola vez; si alguien reutiliza uno viejo, se cierran todas las sesiones de ese usuario.
+5. **Contraseña olvidada:** el enlace vence en 30 minutos. Al cambiar la contraseña se cierran todas las sesiones.
+
+En la base de datos solo se guarda el hash SHA-256 de los tokens, nunca el token. Cada evento (registro, inicio de sesión, intento fallido, cambio de contraseña...) queda en la tabla `auth_audit_logs`.
+Los mensajes de "correo enviado" son iguales exista o no la cuenta, para que nadie pueda averiguar qué correos están registrados.
+
+Con `MAIL_PROVIDER=log` los correos no se envían: el enlace aparece en la consola del servidor, para probar en local.
 
 ## Estructura
 
@@ -72,12 +114,16 @@ Arquitectura por capas: controladores → servicios → repositorios → base de
 ```
 database/                  Diagrama entidad-relación y documentación de la base
 src/main/java/com/obraia/backend/
-├── config/                CORS y configuración de Swagger
+├── config/                Seguridad, JWT, CORS, correo, Swagger y propiedades
 ├── controller/            Reciben la petición y responden con el código HTTP correcto
-├── dto/                   Objetos que se envían como respuesta (JSON)
+├── dto/                   Objetos que se reciben y se envían (JSON)
+├── email/                 Envío de correos (consola o Brevo)
+├── entity/                Tablas de la base de datos como clases Java (JPA)
 ├── exception/             Errores de la aplicación y manejador global de errores
 ├── repository/            Acceso a la base de datos (patrón Repository)
+├── security/              Tokens JWT, hash de tokens y respuestas 401/403 en JSON
 ├── service/               Lógica de negocio
+├── validation/            Reglas de validación propias (contraseña segura)
 └── ObraiaBackendApplication.java   Punto de entrada: inicia el servidor
 src/main/resources/
 ├── application.properties Configuración (lee las variables de entorno)
@@ -101,7 +147,13 @@ Variables que se configuran en el panel de Render (no van en el repositorio):
 | `DB_URL`       | Conexión JDBC directa de Neon (sin *connection pooling*) |
 | `DB_USER`      | Usuario de Neon                                          |
 | `DB_PASSWORD`  | Contraseña de Neon                                       |
-| `FRONTEND_URL` | URL del frontend en Vercel                               |
+| `FRONTEND_URL` | URL del frontend en Vercel (primero) y `http://localhost:5173` |
+| `JWT_SECRET`   | Texto aleatorio de al menos 32 caracteres (distinto al local) |
+| `MAIL_PROVIDER`| `brevo` (o `log` mientras Brevo no esté configurado)     |
+| `MAIL_FROM`    | Correo remitente verificado en Brevo                     |
+| `BREVO_API_KEY`| Clave de la API de Brevo                                 |
+
+El plan gratuito de Render bloquea el envío de correos por SMTP; por eso se usa la API HTTP de Brevo.
 
 Cada vez que se sube un commit a `main`, Render vuelve a desplegar automáticamente.
 En el plan gratuito el servicio se duerme tras unos minutos sin uso: la primera petición después de eso tarda cerca de un minuto.
