@@ -158,6 +158,15 @@ El plan gratuito de Render bloquea el envío de correos por SMTP; por eso se usa
 Cada vez que se sube un commit a `main`, Render vuelve a desplegar automáticamente.
 En el plan gratuito el servicio se duerme tras unos minutos sin uso: la primera petición después de eso tarda cerca de un minuto.
 
+## Equipo y responsabilidades
+
+| Integrante    | Responsabilidad                                                    |
+| ------------- | ------------------------------------------------------------------ |
+| Kevin Basante | Backend (este repositorio), base de datos y servicio de IA         |
+| Arley Riascos | Frontend (`obraia-frontend`)                                       |
+
+Los dos trabajan juntos en el diseño y revisan el avance de los tres repositorios.
+
 ## Convenciones
 
 - Código, comentarios, rutas y claves JSON en inglés; documentación en español.
