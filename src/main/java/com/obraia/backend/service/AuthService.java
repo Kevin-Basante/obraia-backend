@@ -138,6 +138,25 @@ public class AuthService {
         return createSession(user, refreshTokenService.issue(user));
     }
 
+    @Transactional(noRollbackFor = InvalidTokenException.class)
+    public AuthResponse refresh(String refreshToken, ClientInfo client) {
+        RefreshTokenService.Rotation rotation = refreshTokenService.rotate(refreshToken);
+        User user = rotation.user();
+        if (!user.canSignIn()) {
+            refreshTokenService.revokeAll(user.getId());
+            throw new AccountDisabledException();
+        }
+        auditService.record(AuditEvent.TOKEN_REFRESHED, user.getId(), user.getEmail(), client);
+        return createSession(user, rotation.newToken());
+    }
+
+    /** Signing out an unknown or already revoked token is not an error. */
+    @Transactional
+    public void logout(String refreshToken, ClientInfo client) {
+        refreshTokenService.revoke(refreshToken)
+                .ifPresent(userId -> auditService.record(AuditEvent.LOGOUT, userId, null, client));
+    }
+
     private void sendVerificationLink(User user) {
         String token = TokenHasher.generateToken();
         verificationTokens.save(new EmailVerificationToken(user, TokenHasher.hash(token),
