@@ -8,8 +8,11 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.obraia.backend.dto.ErrorResponse;
+import com.obraia.backend.dto.auth.AuthResponse;
 import com.obraia.backend.dto.auth.EmailRequest;
+import com.obraia.backend.dto.auth.LoginRequest;
 import com.obraia.backend.dto.auth.MessageResponse;
+import com.obraia.backend.dto.auth.RefreshTokenRequest;
 import com.obraia.backend.dto.auth.RegisterRequest;
 import com.obraia.backend.dto.auth.TokenRequest;
 import com.obraia.backend.security.ClientInfo;
@@ -62,6 +65,34 @@ public class AuthController {
     @ApiResponse(responseCode = "202", description = "Same answer whether or not the email exists")
     public MessageResponse resendVerification(@Valid @RequestBody EmailRequest request) {
         return authService.resendVerification(request.email());
+    }
+
+    @PostMapping("/login")
+    @Operation(summary = "Sign in and get the access and refresh tokens")
+    @ApiResponse(responseCode = "200", description = "Signed in")
+    @ApiResponse(responseCode = "401", description = "Wrong email or password",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "403", description = "Email not verified or account disabled",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
+        return authService.login(request, ClientInfo.from(http));
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Get a new access token with the refresh token")
+    @ApiResponse(responseCode = "200", description = "New tokens (the old refresh token stops working)")
+    @ApiResponse(responseCode = "401", description = "Invalid, revoked or expired refresh token",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public AuthResponse refresh(@Valid @RequestBody RefreshTokenRequest request, HttpServletRequest http) {
+        return authService.refresh(request.refreshToken(), ClientInfo.from(http));
+    }
+
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Sign out: revoke the refresh token")
+    @ApiResponse(responseCode = "204", description = "Signed out")
+    public void logout(@Valid @RequestBody RefreshTokenRequest request, HttpServletRequest http) {
+        authService.logout(request.refreshToken(), ClientInfo.from(http));
     }
 
 }
