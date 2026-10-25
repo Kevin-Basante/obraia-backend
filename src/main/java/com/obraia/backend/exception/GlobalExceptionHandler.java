@@ -13,6 +13,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.obraia.backend.dto.ErrorResponse;
@@ -48,6 +49,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex) {
         return ResponseEntity.badRequest()
                 .body(ErrorResponse.of("MALFORMED_REQUEST", "The request body is not valid JSON"));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        // For example, a path id that is not a UUID or an area that is not a number.
+        String message = "Invalid value for '" + ex.getName() + "': " + ex.getValue();
+        return ResponseEntity.badRequest().body(ErrorResponse.of("INVALID_PARAMETER", message));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
