@@ -156,6 +156,25 @@ Con `MAIL_PROVIDER=log` los correos no se envían: el enlace aparece en la conso
 - El tamaño de la obra decide sus fases: hasta 120 m² es pequeña (`small`) y más de 120 m² es grande (`large`).
 - Un filtro con un valor desconocido responde 400 con la lista de valores válidos; un id que no existe responde 404.
 
+## Cómo funcionan las obras
+
+- Solo los miembros de una obra pueden verla o cambiarla. Para cualquier otra persona la obra responde 404, como si no existiera.
+- Quien crea la obra es su primer miembro (rol `owner`) y puede agregar a otros usuarios con cuenta verificada. Al creador no se le puede quitar.
+- Estados y cambios permitidos:
+
+  | Estado        | Puede pasar a                          |
+  | ------------- | -------------------------------------- |
+  | `draft`       | `planned`, `cancelled`                 |
+  | `planned`     | `draft`, `in_progress`, `cancelled`    |
+  | `in_progress` | `paused`, `completed`, `cancelled`     |
+  | `paused`      | `in_progress`, `cancelled`             |
+  | `completed`   | ninguno (final)                        |
+  | `cancelled`   | ninguno (final)                        |
+
+  La primera vez que una obra pasa a `in_progress` se guarda la fecha real de inicio; al pasar a `completed`, la fecha real de fin. Una obra terminada o cancelada ya no se puede editar.
+- La respuesta de una obra trae `nextStatuses`, así el frontend solo ofrece los cambios válidos.
+- Cada usuario guarda sus propios maestros de obra. Si borra uno, sus obras quedan sin maestro asignado.
+
 ## Estructura
 
 Arquitectura por capas: controladores → servicios → repositorios → base de datos.
