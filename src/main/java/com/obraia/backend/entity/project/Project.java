@@ -120,6 +120,17 @@ public class Project {
         return SizeCategory.forArea(builtAreaM2);
     }
 
+    /** Moves to a new status and records the real start and end dates. */
+    public void changeStatus(ProjectStatus next, LocalDate today) {
+        if (next == ProjectStatus.IN_PROGRESS && actualStartDate == null) {
+            actualStartDate = today;
+        }
+        if (next == ProjectStatus.COMPLETED) {
+            actualEndDate = actualStartDate != null && today.isBefore(actualStartDate) ? actualStartDate : today;
+        }
+        this.status = next;
+    }
+
     public void assignSiteManager(SiteManager siteManager) {
         this.siteManager = siteManager;
     }
