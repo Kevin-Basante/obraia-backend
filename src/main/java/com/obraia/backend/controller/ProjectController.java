@@ -1,5 +1,6 @@
 package com.obraia.backend.controller;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -17,6 +19,7 @@ import com.obraia.backend.config.OpenApiConfig;
 import com.obraia.backend.dto.ErrorResponse;
 import com.obraia.backend.dto.project.ProjectRequest;
 import com.obraia.backend.dto.project.ProjectResponse;
+import com.obraia.backend.dto.project.ProjectSummaryResponse;
 import com.obraia.backend.service.ProjectService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,6 +51,17 @@ public class ProjectController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     public ProjectResponse create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ProjectRequest request) {
         return projectService.create(userId(jwt), request);
+    }
+
+    @GetMapping
+    @Operation(summary = "List my projects, newest first",
+            description = "Optional filters: status code and a search on the name or city that ignores accents.")
+    @ApiResponse(responseCode = "200", description = "Projects of the user")
+    @ApiResponse(responseCode = "400", description = "Unknown status",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public List<ProjectSummaryResponse> list(@AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) String status, @RequestParam(required = false) String search) {
+        return projectService.list(userId(jwt), status, search);
     }
 
     @GetMapping("/{id}")
