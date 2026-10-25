@@ -1,11 +1,13 @@
 package com.obraia.backend.repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -33,4 +35,9 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     Optional<Project> findVisibleTo(@Param("projectId") UUID projectId, @Param("userId") UUID userId);
 
     Optional<Project> findByIdAndDeletedAtIsNull(UUID id);
+
+    /** Removes for good the projects deleted before the limit. Their related rows go with them (ON DELETE CASCADE). */
+    @Modifying
+    @Query("DELETE FROM Project p WHERE p.deletedAt < :limit")
+    int purgeDeletedBefore(@Param("limit") Instant limit);
 }
