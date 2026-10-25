@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,11 +20,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.obraia.backend.config.OpenApiConfig;
 import com.obraia.backend.dto.ErrorResponse;
+import com.obraia.backend.dto.project.AssignSiteManagerRequest;
 import com.obraia.backend.dto.project.ProjectRequest;
 import com.obraia.backend.dto.project.ProjectResponse;
 import com.obraia.backend.dto.project.ProjectSummaryResponse;
 import com.obraia.backend.dto.project.StatusChangeRequest;
 import com.obraia.backend.service.ProjectService;
+import com.obraia.backend.service.ProjectSiteManagerService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -41,9 +44,11 @@ import jakarta.validation.Valid;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final ProjectSiteManagerService siteManagerService;
 
-    public ProjectController(ProjectService projectService) {
+    public ProjectController(ProjectService projectService, ProjectSiteManagerService siteManagerService) {
         this.projectService = projectService;
+        this.siteManagerService = siteManagerService;
     }
 
     @PostMapping
@@ -97,6 +102,23 @@ public class ProjectController {
     public ProjectResponse changeStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
             @Valid @RequestBody StatusChangeRequest request) {
         return projectService.changeStatus(id, userId(jwt), request.status());
+    }
+
+    @PutMapping("/{id}/site-manager")
+    @Operation(summary = "Assign one of my site managers to the project")
+    @ApiResponse(responseCode = "200", description = "Site manager assigned")
+    @ApiResponse(responseCode = "404", description = "The project or the site manager does not exist",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public ProjectResponse assignSiteManager(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+            @Valid @RequestBody AssignSiteManagerRequest request) {
+        return siteManagerService.assign(id, userId(jwt), request.siteManagerId());
+    }
+
+    @DeleteMapping("/{id}/site-manager")
+    @Operation(summary = "Leave the project without a site manager")
+    @ApiResponse(responseCode = "200", description = "Site manager removed from the project")
+    public ProjectResponse unassignSiteManager(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        return siteManagerService.unassign(id, userId(jwt));
     }
 
     static UUID userId(Jwt jwt) {
