@@ -175,6 +175,13 @@ Con `MAIL_PROVIDER=log` los correos no se envían: el enlace aparece en la conso
 - La respuesta de una obra trae `nextStatuses`, así el frontend solo ofrece los cambios válidos.
 - Cada usuario guarda sus propios maestros de obra. Si borra uno, sus obras quedan sin maestro asignado.
 
+### Eliminar una obra
+
+1. El frontend pide `deletion-impact` y muestra las advertencias: planos, fases, presupuestos, gastos y miembros que tiene la obra.
+2. Solo el creador puede pedir la eliminación. El backend envía un correo con un enlace que vence en 30 minutos. Si el correo no sale, la solicitud se cancela (503).
+3. El enlace abre el frontend (`/confirm-deletion?token=...`), que llama a `/api/projects/deletion/confirm`. La obra desaparece de la lista de inmediato.
+4. Los datos se guardan 30 días por si hubo un error y después una tarea diaria (4:00 a. m., hora de Colombia) los borra para siempre.
+
 ## Estructura
 
 Arquitectura por capas: controladores → servicios → repositorios → base de datos.
