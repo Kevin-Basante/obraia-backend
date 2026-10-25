@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -21,6 +22,7 @@ import com.obraia.backend.dto.ErrorResponse;
 import com.obraia.backend.dto.project.ProjectRequest;
 import com.obraia.backend.dto.project.ProjectResponse;
 import com.obraia.backend.dto.project.ProjectSummaryResponse;
+import com.obraia.backend.dto.project.StatusChangeRequest;
 import com.obraia.backend.service.ProjectService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -84,6 +86,17 @@ public class ProjectController {
     public ProjectResponse update(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
             @Valid @RequestBody ProjectRequest request) {
         return projectService.update(id, userId(jwt), request);
+    }
+
+    @PatchMapping("/{id}/status")
+    @Operation(summary = "Change the status of a project",
+            description = "Only the statuses listed in nextStatuses are accepted.")
+    @ApiResponse(responseCode = "200", description = "Status changed")
+    @ApiResponse(responseCode = "409", description = "The change is not allowed from the current status",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public ProjectResponse changeStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+            @Valid @RequestBody StatusChangeRequest request) {
+        return projectService.changeStatus(id, userId(jwt), request.status());
     }
 
     static UUID userId(Jwt jwt) {
