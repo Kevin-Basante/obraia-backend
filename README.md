@@ -102,6 +102,33 @@ Al arrancar, Flyway crea las tablas y carga los datos iniciales si todavía no e
 | ------ | --------------- | -------------------------------- |
 | GET    | `/api/users/me` | Datos del usuario que inició sesión |
 
+### Obras (requieren token)
+
+| Método | Ruta                                  | Qué hace                                                        |
+| ------ | ------------------------------------- | --------------------------------------------------------------- |
+| POST   | `/api/projects`                       | Crear una obra (queda en borrador)                              |
+| GET    | `/api/projects`                       | Mis obras, de la más nueva a la más vieja (`?status=draft`, `?search=casa`) |
+| GET    | `/api/projects/{id}`                  | Datos completos de una obra                                     |
+| PUT    | `/api/projects/{id}`                  | Editar una obra                                                 |
+| PATCH  | `/api/projects/{id}/status`           | Cambiar el estado (`{ "status": "in_progress" }`)               |
+| PUT    | `/api/projects/{id}/site-manager`     | Asignar un maestro de obra                                      |
+| DELETE | `/api/projects/{id}/site-manager`     | Quitar el maestro de obra                                       |
+| GET    | `/api/projects/{id}/members`          | Personas que administran la obra                                |
+| POST   | `/api/projects/{id}/members`          | Agregar a un usuario registrado por su correo                   |
+| DELETE | `/api/projects/{id}/members/{userId}` | Quitar a una persona de la obra                                 |
+| GET    | `/api/projects/{id}/deletion-impact`  | Lo que se perdería al eliminar la obra                          |
+| POST   | `/api/projects/{id}/deletion-request` | Enviar el correo para confirmar la eliminación                  |
+| POST   | `/api/projects/deletion/confirm`      | Confirmar la eliminación con el token del correo (pública)      |
+
+### Maestros de obra (requieren token)
+
+| Método | Ruta                       | Qué hace                         |
+| ------ | -------------------------- | -------------------------------- |
+| GET    | `/api/site-managers`       | Mis maestros de obra             |
+| POST   | `/api/site-managers`       | Guardar un maestro de obra       |
+| PUT    | `/api/site-managers/{id}`  | Editar un maestro de obra        |
+| DELETE | `/api/site-managers/{id}`  | Borrar un maestro de obra        |
+
 Las rutas protegidas necesitan el encabezado `Authorization: Bearer <accessToken>`.
 En Swagger se usa el botón **Authorize** con el token que devuelve el login.
 
@@ -142,6 +169,7 @@ src/main/java/com/obraia/backend/
 ├── email/                 Envío de correos (consola o Brevo)
 ├── entity/                Tablas de la base de datos como clases Java (JPA)
 ├── entity/catalog/        Catálogos: tipos de obra, ciudades, materiales, fases y fórmulas
+├── entity/project/        Obras, miembros, maestros de obra y solicitudes de eliminación
 ├── exception/             Errores de la aplicación y manejador global de errores
 ├── repository/            Acceso a la base de datos (patrón Repository)
 ├── security/              Tokens JWT, hash de tokens y respuestas 401/403 en JSON
