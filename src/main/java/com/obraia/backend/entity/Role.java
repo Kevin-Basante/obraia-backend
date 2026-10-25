@@ -15,6 +15,9 @@ public class Role {
     /** Role given to every account created with the register endpoint. */
     public static final String USER = "user";
 
+    /** Project role of the person who builds on their own land. Has every permission in the project. */
+    public static final String OWNER = "owner";
+
     @Id
     private UUID id;
 
