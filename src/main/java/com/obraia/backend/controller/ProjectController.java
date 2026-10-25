@@ -9,6 +9,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -71,6 +72,18 @@ public class ProjectController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     public ProjectResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         return projectService.get(id, userId(jwt));
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Edit the data of a project")
+    @ApiResponse(responseCode = "200", description = "Project updated")
+    @ApiResponse(responseCode = "404", description = "The project does not exist or the user is not a member",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "The project is completed or cancelled",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public ProjectResponse update(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+            @Valid @RequestBody ProjectRequest request) {
+        return projectService.update(id, userId(jwt), request);
     }
 
     static UUID userId(Jwt jwt) {
