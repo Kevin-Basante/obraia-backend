@@ -23,4 +23,9 @@ public class InvalidTokenException extends AppException {
         return new InvalidTokenException(HttpStatus.BAD_REQUEST, "INVALID_RESET_TOKEN",
                 "The password reset link is invalid or has expired");
     }
+
+    public static InvalidTokenException deletionLink() {
+        return new InvalidTokenException(HttpStatus.BAD_REQUEST, "INVALID_DELETION_TOKEN",
+                "The deletion link is invalid or has expired");
+    }
 }
