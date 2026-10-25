@@ -31,4 +31,6 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
               AND EXISTS (SELECT 1 FROM ProjectMember m WHERE m.project = p AND m.user.id = :userId)
             """)
     Optional<Project> findVisibleTo(@Param("projectId") UUID projectId, @Param("userId") UUID userId);
+
+    Optional<Project> findByIdAndDeletedAtIsNull(UUID id);
 }

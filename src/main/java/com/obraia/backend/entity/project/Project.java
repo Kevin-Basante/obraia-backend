@@ -135,6 +135,10 @@ public class Project {
         this.siteManager = siteManager;
     }
 
+    public void markDeleted(Instant when) {
+        this.deletedAt = when;
+    }
+
     public boolean isDeleted() {
         return deletedAt != null;
     }
