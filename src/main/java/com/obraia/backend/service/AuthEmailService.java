@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import com.obraia.backend.email.EmailDeliveryException;
 import com.obraia.backend.email.EmailMessage;
 import com.obraia.backend.email.EmailSender;
+import com.obraia.backend.email.EmailText;
 import com.obraia.backend.entity.User;
 
 /**
@@ -27,9 +28,7 @@ public class AuthEmailService {
 
     public AuthEmailService(EmailSender emailSender, @Value("${app.frontend-url}") String frontendUrls) {
         this.emailSender = emailSender;
-        // FRONTEND_URL may list several URLs: the first one is used in the links.
-        String first = frontendUrls.split(",")[0].trim();
-        this.frontendBaseUrl = first.endsWith("/") ? first.substring(0, first.length() - 1) : first;
+        this.frontendBaseUrl = EmailText.firstUrl(frontendUrls);
     }
 
     public void sendVerificationEmail(User user, String token) {
@@ -39,7 +38,7 @@ public class AuthEmailService {
                 <p>Thanks for signing up for ObraIA. Confirm your email to activate your account:</p>
                 <p><a href="%s">Verify my email</a></p>
                 <p>The link expires in 24 hours. If you did not create an account, ignore this email.</p>
-                """.formatted(escape(user.getFirstName()), link);
+                """.formatted(EmailText.escape(user.getFirstName()), link);
         deliver(new EmailMessage(user.getEmail(), fullName(user), "Verify your ObraIA account", html));
     }
 
@@ -50,7 +49,7 @@ public class AuthEmailService {
                 <p>We received a request to reset your ObraIA password:</p>
                 <p><a href="%s">Choose a new password</a></p>
                 <p>The link expires in 30 minutes. If you did not ask for it, ignore this email.</p>
-                """.formatted(escape(user.getFirstName()), link);
+                """.formatted(EmailText.escape(user.getFirstName()), link);
         deliver(new EmailMessage(user.getEmail(), fullName(user), "Reset your ObraIA password", html));
     }
 
@@ -72,10 +71,5 @@ public class AuthEmailService {
 
     private static String fullName(User user) {
         return user.getFirstName() + " " + user.getLastName();
-    }
-
-    /** The name is typed by the user, so it is escaped before going into HTML. */
-    private static String escape(String text) {
-        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 }
