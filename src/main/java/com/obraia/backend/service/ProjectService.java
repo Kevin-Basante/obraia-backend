@@ -1,5 +1,6 @@
 package com.obraia.backend.service;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -7,12 +8,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.obraia.backend.dto.project.ProjectRequest;
 import com.obraia.backend.dto.project.ProjectResponse;
+import com.obraia.backend.dto.project.ProjectSummaryResponse;
 import com.obraia.backend.entity.Role;
 import com.obraia.backend.entity.User;
 import com.obraia.backend.entity.catalog.Location;
 import com.obraia.backend.entity.catalog.ProjectType;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.entity.project.ProjectMember;
+import com.obraia.backend.entity.project.ProjectStatus;
 import com.obraia.backend.exception.BadRequestException;
 import com.obraia.backend.exception.ResourceNotFoundException;
 import com.obraia.backend.repository.LocationRepository;
@@ -21,6 +24,7 @@ import com.obraia.backend.repository.ProjectRepository;
 import com.obraia.backend.repository.ProjectTypeRepository;
 import com.obraia.backend.repository.RoleRepository;
 import com.obraia.backend.repository.UserRepository;
+import com.obraia.backend.util.TextSearch;
 
 import jakarta.persistence.EntityManager;
 
@@ -67,6 +71,18 @@ public class ProjectService {
         // Reads the values the database filled in (created_at, updated_at).
         entityManager.refresh(project);
         return ProjectResponse.from(project, owner.getName());
+    }
+
+    /** Projects of the user, newest first. Both filters are optional; the search ignores accents. */
+    @Transactional(readOnly = true)
+    public List<ProjectSummaryResponse> list(UUID userId, String statusCode, String search) {
+        ProjectStatus status = statusCode == null || statusCode.isBlank() ? null : ProjectStatus.fromCode(statusCode);
+        return projectRepository.findVisibleTo(userId).stream()
+                .filter(project -> status == null || project.getStatus() == status)
+                .filter(project -> TextSearch.matches(project.getName() + " " + project.getLocation().getCity(),
+                        search))
+                .map(ProjectSummaryResponse::from)
+                .toList();
     }
 
     @Transactional(readOnly = true)
