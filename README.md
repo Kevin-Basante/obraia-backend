@@ -121,6 +121,14 @@ Los mensajes de "correo enviado" son iguales exista o no la cuenta, para que nad
 
 Con `MAIL_PROVIDER=log` los correos no se envían: el enlace aparece en la consola del servidor, para probar en local.
 
+## Cómo funcionan los catálogos
+
+- Los datos vienen de la migración V3 y no cambian mientras el servidor está encendido. Por eso el backend los guarda en memoria (caché) después de la primera consulta y no vuelve a preguntarle a la base de datos.
+- Las respuestas llevan `Cache-Control: max-age=600`, así el navegador puede reutilizarlas durante 10 minutos.
+- Las búsquedas ignoran mayúsculas y tildes: `bogota` encuentra "Bogotá" y `rio` encuentra "Arena de río".
+- El tamaño de la obra decide sus fases: hasta 120 m² es pequeña (`small`) y más de 120 m² es grande (`large`).
+- Un filtro con un valor desconocido responde 400 con la lista de valores válidos; un id que no existe responde 404.
+
 ## Estructura
 
 Arquitectura por capas: controladores → servicios → repositorios → base de datos.
@@ -133,10 +141,12 @@ src/main/java/com/obraia/backend/
 ├── dto/                   Objetos que se reciben y se envían (JSON)
 ├── email/                 Envío de correos (consola o Brevo)
 ├── entity/                Tablas de la base de datos como clases Java (JPA)
+├── entity/catalog/        Catálogos: tipos de obra, ciudades, materiales, fases y fórmulas
 ├── exception/             Errores de la aplicación y manejador global de errores
 ├── repository/            Acceso a la base de datos (patrón Repository)
 ├── security/              Tokens JWT, hash de tokens y respuestas 401/403 en JSON
 ├── service/               Lógica de negocio
+├── util/                  Utilidades (búsqueda sin tildes)
 ├── validation/            Reglas de validación propias (contraseña segura)
 └── ObraiaBackendApplication.java   Punto de entrada: inicia el servidor
 src/main/resources/
