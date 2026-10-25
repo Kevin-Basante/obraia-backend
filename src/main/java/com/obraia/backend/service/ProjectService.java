@@ -17,6 +17,7 @@ import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.entity.project.ProjectMember;
 import com.obraia.backend.entity.project.ProjectStatus;
 import com.obraia.backend.exception.BadRequestException;
+import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.exception.ResourceNotFoundException;
 import com.obraia.backend.repository.LocationRepository;
 import com.obraia.backend.repository.ProjectMemberRepository;
@@ -89,6 +90,27 @@ public class ProjectService {
     public ProjectResponse get(UUID projectId, UUID userId) {
         ProjectMember member = accessService.requireMembership(projectId, userId);
         return ProjectResponse.from(accessService.requireProject(projectId, userId), member.getRole().getName());
+    }
+
+    /** Edits the project data. Finished or cancelled projects are read only. */
+    @Transactional
+    public ProjectResponse update(UUID projectId, UUID userId, ProjectRequest request) {
+        ProjectMember member = accessService.requireMembership(projectId, userId);
+        Project project = accessService.requireProject(projectId, userId);
+        requireEditable(project);
+        project.update(findProjectType(request), findLocation(request), request.name().trim(),
+                trimToNull(request.address()), request.builtAreaM2(), request.floors(), request.plannedStartDate(),
+                request.plannedEndDate());
+        projectRepository.saveAndFlush(project);
+        entityManager.refresh(project);
+        return ProjectResponse.from(project, member.getRole().getName());
+    }
+
+    static void requireEditable(Project project) {
+        if (project.getStatus().nextStatuses().isEmpty()) {
+            throw new ConflictException("PROJECT_CLOSED",
+                    "A " + project.getStatus().getCode() + " project cannot be edited");
+        }
     }
 
     private ProjectType findProjectType(ProjectRequest request) {
