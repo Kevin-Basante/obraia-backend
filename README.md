@@ -82,6 +82,20 @@ Al arrancar, Flyway crea las tablas y carga los datos iniciales si todavía no e
 | POST   | `/api/auth/forgot-password`      | Envía el enlace para cambiar la contraseña (202)                |
 | POST   | `/api/auth/reset-password`       | Cambia la contraseña con el token del enlace                    |
 
+### Catálogos (públicos, solo lectura)
+
+| Método | Ruta                                                | Qué hace                                                            |
+| ------ | --------------------------------------------------- | ------------------------------------------------------------------- |
+| GET    | `/api/catalogs/project-types`                       | Tipos de obra                                                       |
+| GET    | `/api/catalogs/project-types/{id}`                  | Un tipo de obra                                                     |
+| GET    | `/api/catalogs/project-types/{id}/phases`           | Fases estándar y duración total (`?size=small` o `?area=95`)        |
+| GET    | `/api/catalogs/project-types/{id}/material-formulas` | Consumo de materiales por elemento (`?element=wall`)               |
+| GET    | `/api/catalogs/locations`                           | Ciudades (`?department=Antioquia`, `?search=bogota`)                |
+| GET    | `/api/catalogs/locations/departments`               | Departamentos con ciudades                                          |
+| GET    | `/api/catalogs/material-categories`                 | Categorías de materiales                                            |
+| GET    | `/api/catalogs/materials`                           | Materiales con precio de referencia (`?category=steel`, `?search=arena`) |
+| GET    | `/api/catalogs/materials/{id}`                      | Un material                                                         |
+
 ### Usuario (requieren token)
 
 | Método | Ruta            | Qué hace                         |
