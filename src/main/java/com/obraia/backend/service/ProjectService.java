@@ -1,7 +1,10 @@
 package com.obraia.backend.service;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,11 +44,12 @@ public class ProjectService {
     private final RoleRepository roleRepository;
     private final ProjectAccessService accessService;
     private final EntityManager entityManager;
+    private final Clock clock;
 
     public ProjectService(ProjectRepository projectRepository, ProjectMemberRepository memberRepository,
             ProjectTypeRepository projectTypeRepository, LocationRepository locationRepository,
             UserRepository userRepository, RoleRepository roleRepository, ProjectAccessService accessService,
-            EntityManager entityManager) {
+            EntityManager entityManager, Clock clock) {
         this.projectRepository = projectRepository;
         this.memberRepository = memberRepository;
         this.projectTypeRepository = projectTypeRepository;
@@ -54,6 +58,7 @@ public class ProjectService {
         this.roleRepository = roleRepository;
         this.accessService = accessService;
         this.entityManager = entityManager;
+        this.clock = clock;
     }
 
     /** Creates a draft project. The creator becomes its first member, with the owner role. */
@@ -106,6 +111,22 @@ public class ProjectService {
         return ProjectResponse.from(project, member.getRole().getName());
     }
 
+    /** Moves the project to another status, only along the allowed paths. */
+    @Transactional
+    public ProjectResponse changeStatus(UUID projectId, UUID userId, String statusCode) {
+        ProjectMember member = accessService.requireMembership(projectId, userId);
+        Project project = accessService.requireProject(projectId, userId);
+        ProjectStatus next = ProjectStatus.fromCode(statusCode);
+        if (!project.getStatus().canChangeTo(next)) {
+            throw new ConflictException("INVALID_STATUS_CHANGE", "A project that is " + project.getStatus().getCode()
+                    + " cannot change to " + next.getCode() + ". Allowed: " + allowed(project.getStatus()));
+        }
+        project.changeStatus(next, LocalDate.now(clock));
+        projectRepository.saveAndFlush(project);
+        entityManager.refresh(project);
+        return ProjectResponse.from(project, member.getRole().getName());
+    }
+
     static void requireEditable(Project project) {
         if (project.getStatus().nextStatuses().isEmpty()) {
             throw new ConflictException("PROJECT_CLOSED",
@@ -123,6 +144,11 @@ public class ProjectService {
         return locationRepository.findById(request.locationId())
                 .orElseThrow(() -> new BadRequestException("INVALID_LOCATION",
                         "The city " + request.locationId() + " does not exist"));
+    }
+
+    private static String allowed(ProjectStatus status) {
+        String next = status.nextStatuses().stream().map(ProjectStatus::getCode).collect(Collectors.joining(", "));
+        return next.isEmpty() ? "none" : next;
     }
 
     private static String trimToNull(String text) {
