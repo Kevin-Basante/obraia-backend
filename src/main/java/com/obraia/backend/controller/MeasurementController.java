@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.obraia.backend.config.OpenApiConfig;
 import com.obraia.backend.dto.ErrorResponse;
+import com.obraia.backend.dto.blueprint.ComparisonResponse;
 import com.obraia.backend.dto.blueprint.MeasurementRequest;
 import com.obraia.backend.dto.blueprint.MeasurementResponse;
 import com.obraia.backend.service.MeasurementService;
@@ -100,4 +101,11 @@ public class MeasurementController {
         measurementService.delete(projectId, ProjectController.userId(jwt), measurementId);
     }
 
+    @GetMapping("/comparison")
+    @Operation(summary = "Manual totals against AI totals, by element and floor",
+            description = "Until the AI measures a blueprint, every row is manual_only.")
+    @ApiResponse(responseCode = "200", description = "Totals and their difference in percent")
+    public ComparisonResponse comparison(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId) {
+        return measurementService.compare(projectId, ProjectController.userId(jwt));
+    }
 }

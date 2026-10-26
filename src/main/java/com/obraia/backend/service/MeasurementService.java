@@ -9,6 +9,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.obraia.backend.dto.blueprint.ComparisonResponse;
 import com.obraia.backend.dto.blueprint.MeasurementRequest;
 import com.obraia.backend.dto.blueprint.MeasurementResponse;
 import com.obraia.backend.entity.blueprint.Blueprint;
@@ -91,6 +92,12 @@ public class MeasurementService {
         Project project = accessService.requireProject(projectId, userId);
         ProjectService.requireEditable(project);
         measurementRepository.delete(requireManual(projectId, measurementId));
+    }
+
+    @Transactional(readOnly = true)
+    public ComparisonResponse compare(UUID projectId, UUID userId) {
+        accessService.requireMembership(projectId, userId);
+        return MeasurementComparator.compare(measurementRepository.findByProjectIdOrderByCreatedAtAsc(projectId));
     }
 
     private BlueprintMeasurement requireManual(UUID projectId, UUID measurementId) {
