@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -92,4 +93,16 @@ public class BlueprintController {
                 .body(file.content());
     }
 
+    @DeleteMapping("/{blueprintId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Delete a blueprint", description = "Its measurements stay, without the link to it.")
+    @ApiResponse(responseCode = "204", description = "Blueprint deleted")
+    @ApiResponse(responseCode = "404", description = "The blueprint does not exist in the project",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "The project is closed",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId,
+            @PathVariable UUID blueprintId) {
+        blueprintService.delete(projectId, ProjectController.userId(jwt), blueprintId);
+    }
 }
