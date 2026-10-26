@@ -47,6 +47,7 @@ El archivo `.env` está en `.gitignore` y **nunca** se sube a GitHub.
 | `MAIL_PROVIDER`| `log` muestra los correos en la consola (desarrollo); `brevo` los envía   |
 | `MAIL_FROM`    | Remitente de los correos (debe estar verificado en Brevo)               |
 | `BREVO_API_KEY`| Clave de la API de Brevo (solo si `MAIL_PROVIDER=brevo`)                |
+| `STORAGE_PROVIDER` | Dónde se guardan los planos: `database` (por defecto) o `local` (carpeta `uploads/`) |
 | `PORT`         | Puerto del servidor (por defecto 8080; Render lo asigna solo)           |
 
 ## Comandos
@@ -95,6 +96,7 @@ Al arrancar, Flyway crea las tablas y carga los datos iniciales si todavía no e
 | GET    | `/api/catalogs/material-categories`                 | Categorías de materiales                                            |
 | GET    | `/api/catalogs/materials`                           | Materiales con precio de referencia (`?category=steel`, `?search=arena`) |
 | GET    | `/api/catalogs/materials/{id}`                      | Un material                                                         |
+| GET    | `/api/catalogs/element-types`                       | Elementos que se miden, su unidad (m³ o m²) y las medidas que necesitan |
 
 ### Usuario (requieren token)
 
@@ -119,6 +121,25 @@ Al arrancar, Flyway crea las tablas y carga los datos iniciales si todavía no e
 | GET    | `/api/projects/{id}/deletion-impact`  | Lo que se perdería al eliminar la obra                          |
 | POST   | `/api/projects/{id}/deletion-request` | Enviar el correo para confirmar la eliminación                  |
 | POST   | `/api/projects/deletion/confirm`      | Confirmar la eliminación con el token del correo (pública)      |
+
+### Planos (requieren token)
+
+| Método | Ruta                                           | Qué hace                                                  |
+| ------ | ---------------------------------------------- | --------------------------------------------------------- |
+| GET    | `/api/projects/{id}/blueprints`                | Planos de la obra, del más nuevo al más viejo             |
+| POST   | `/api/projects/{id}/blueprints`                | Subir un plano (`multipart/form-data`, campo `file`)      |
+| GET    | `/api/projects/{id}/blueprints/{planoId}/file` | Abrir el archivo del plano                                |
+| DELETE | `/api/projects/{id}/blueprints/{planoId}`      | Borrar un plano (sus medidas se conservan)                |
+
+### Medidas (requieren token)
+
+| Método | Ruta                                              | Qué hace                                                 |
+| ------ | ------------------------------------------------- | -------------------------------------------------------- |
+| GET    | `/api/projects/{id}/measurements`                 | Medidas de la obra (`?floor=1`, `?element=wall`)         |
+| POST   | `/api/projects/{id}/measurements`                 | Agregar una medida manual                                |
+| PUT    | `/api/projects/{id}/measurements/{medidaId}`      | Editar una medida manual                                 |
+| DELETE | `/api/projects/{id}/measurements/{medidaId}`      | Borrar una medida manual                                 |
+| GET    | `/api/projects/{id}/measurements/comparison`      | Totales manuales contra los de la IA, por elemento y piso |
 
 ### Maestros de obra (requieren token)
 
