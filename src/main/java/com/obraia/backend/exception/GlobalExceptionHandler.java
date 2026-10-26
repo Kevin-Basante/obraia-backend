@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -77,6 +78,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleMissingFile(Exception ex) {
         return ResponseEntity.badRequest()
                 .body(ErrorResponse.of("MISSING_FILE", "Send the file as multipart/form-data in the part \"file\""));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex) {
+        String message = "Content type " + ex.getContentType() + " is not accepted on this route";
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(ErrorResponse.of("UNSUPPORTED_MEDIA_TYPE", message));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
