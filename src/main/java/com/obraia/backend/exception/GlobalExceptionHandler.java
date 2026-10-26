@@ -21,6 +21,7 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.obraia.backend.dto.ErrorResponse;
+import com.obraia.backend.storage.StoredFileNotFoundException;
 
 /**
  * Turns every exception into the same JSON error shape, so the frontend
@@ -85,6 +86,14 @@ public class GlobalExceptionHandler {
         String message = "Content type " + ex.getContentType() + " is not accepted on this route";
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                 .body(ErrorResponse.of("UNSUPPORTED_MEDIA_TYPE", message));
+    }
+
+    @ExceptionHandler(StoredFileNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleMissingStoredFile(StoredFileNotFoundException ex) {
+        // The row exists but the bytes do not, for example after changing STORAGE_PROVIDER.
+        log.error(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ErrorResponse.of("FILE_NOT_FOUND", "The file of this blueprint is no longer available"));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
