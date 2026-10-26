@@ -6,9 +6,11 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -69,6 +71,33 @@ public class MeasurementController {
     public MeasurementResponse create(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId,
             @Valid @RequestBody MeasurementRequest request) {
         return measurementService.create(projectId, ProjectController.userId(jwt), request);
+    }
+
+    @PutMapping("/{measurementId}")
+    @Operation(summary = "Edit a manual measurement")
+    @ApiResponse(responseCode = "200", description = "Measurement saved")
+    @ApiResponse(responseCode = "400", description = "Invalid fields",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "404", description = "The measurement does not exist in the project",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "The project is closed or the measurement comes from the AI",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public MeasurementResponse update(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId,
+            @PathVariable UUID measurementId, @Valid @RequestBody MeasurementRequest request) {
+        return measurementService.update(projectId, ProjectController.userId(jwt), measurementId, request);
+    }
+
+    @DeleteMapping("/{measurementId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Delete a manual measurement")
+    @ApiResponse(responseCode = "204", description = "Measurement deleted")
+    @ApiResponse(responseCode = "404", description = "The measurement does not exist in the project",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "The project is closed or the measurement comes from the AI",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId,
+            @PathVariable UUID measurementId) {
+        measurementService.delete(projectId, ProjectController.userId(jwt), measurementId);
     }
 
 }
