@@ -17,7 +17,9 @@ import com.obraia.backend.entity.blueprint.MeasurementRules;
 import com.obraia.backend.entity.blueprint.MeasurementSource;
 import com.obraia.backend.entity.catalog.ElementType;
 import com.obraia.backend.entity.project.Project;
+import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.exception.FieldValidationException;
+import com.obraia.backend.exception.ResourceNotFoundException;
 import com.obraia.backend.repository.BlueprintMeasurementRepository;
 import com.obraia.backend.repository.BlueprintRepository;
 
@@ -72,6 +74,33 @@ public class MeasurementService {
         // Reads created_at, which the database fills in.
         entityManager.refresh(measurement);
         return MeasurementResponse.from(measurement);
+    }
+
+    @Transactional
+    public MeasurementResponse update(UUID projectId, UUID userId, UUID measurementId, MeasurementRequest request) {
+        Project project = accessService.requireProject(projectId, userId);
+        ProjectService.requireEditable(project);
+        BlueprintMeasurement measurement = requireManual(projectId, measurementId);
+        apply(measurement, project, request);
+        measurementRepository.saveAndFlush(measurement);
+        return MeasurementResponse.from(measurement);
+    }
+
+    @Transactional
+    public void delete(UUID projectId, UUID userId, UUID measurementId) {
+        Project project = accessService.requireProject(projectId, userId);
+        ProjectService.requireEditable(project);
+        measurementRepository.delete(requireManual(projectId, measurementId));
+    }
+
+    private BlueprintMeasurement requireManual(UUID projectId, UUID measurementId) {
+        BlueprintMeasurement measurement = measurementRepository.findByIdAndProjectId(measurementId, projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("MEASUREMENT_NOT_FOUND",
+                        "The measurement " + measurementId + " does not exist in this project"));
+        if (measurement.getSource() != MeasurementSource.MANUAL) {
+            throw new ConflictException("AI_MEASUREMENT_READ_ONLY", "Measurements read by the AI cannot be changed");
+        }
+        return measurement;
     }
 
     /** Checks the rules that depend on the element and the project, then copies the data. */
