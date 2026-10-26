@@ -91,6 +91,16 @@ public class BlueprintService {
                 storage.load(blueprint.getFilePath()));
     }
 
+    /** The measurements taken from it stay; they just lose the link (ON DELETE SET NULL). */
+    @Transactional
+    public void delete(UUID projectId, UUID userId, UUID blueprintId) {
+        Blueprint blueprint = requireBlueprint(projectId, userId, blueprintId);
+        ProjectService.requireEditable(blueprint.getProject());
+        blueprintRepository.delete(blueprint);
+        blueprintRepository.flush();
+        storage.delete(blueprint.getFilePath());
+    }
+
     Blueprint requireBlueprint(UUID projectId, UUID userId, UUID blueprintId) {
         accessService.requireMembership(projectId, userId);
         return blueprintRepository.findByIdAndProjectId(blueprintId, projectId)
