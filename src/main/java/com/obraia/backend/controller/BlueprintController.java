@@ -1,11 +1,15 @@
 package com.obraia.backend.controller;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +25,7 @@ import com.obraia.backend.config.OpenApiConfig;
 import com.obraia.backend.dto.ErrorResponse;
 import com.obraia.backend.dto.blueprint.BlueprintResponse;
 import com.obraia.backend.service.BlueprintService;
+import com.obraia.backend.service.BlueprintService.BlueprintFile;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -66,6 +71,25 @@ public class BlueprintController {
             @RequestPart("file") MultipartFile file) throws IOException {
         return blueprintService.upload(projectId, ProjectController.userId(jwt), file.getOriginalFilename(),
                 file.getBytes());
+    }
+
+    @GetMapping("/{blueprintId}/file")
+    @Operation(summary = "Open the file of a blueprint",
+            description = "Answers the bytes with their real content type, to show them in the browser.")
+    @ApiResponse(responseCode = "200", description = "The file")
+    @ApiResponse(responseCode = "404", description = "The blueprint does not exist in the project",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public ResponseEntity<byte[]> file(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId,
+            @PathVariable UUID blueprintId) {
+        BlueprintFile file = blueprintService.download(projectId, ProjectController.userId(jwt), blueprintId);
+        ContentDisposition disposition = ContentDisposition.inline()
+                .filename(file.filename(), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(file.mimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+                .body(file.content());
     }
 
 }
