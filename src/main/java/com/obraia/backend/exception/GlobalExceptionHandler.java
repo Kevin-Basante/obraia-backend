@@ -14,6 +14,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.obraia.backend.dto.ErrorResponse;
@@ -62,6 +65,18 @@ public class GlobalExceptionHandler {
         // For example, a path id that is not a UUID or an area that is not a number.
         String message = "Invalid value for '" + ex.getName() + "': " + ex.getValue();
         return ResponseEntity.badRequest().body(ErrorResponse.of("INVALID_PARAMETER", message));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ErrorResponse.of("FILE_TOO_LARGE", "The file is too large. The limit is 10 MB"));
+    }
+
+    @ExceptionHandler({MissingServletRequestPartException.class, MultipartException.class})
+    public ResponseEntity<ErrorResponse> handleMissingFile(Exception ex) {
+        return ResponseEntity.badRequest()
+                .body(ErrorResponse.of("MISSING_FILE", "Send the file as multipart/form-data in the part \"file\""));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
