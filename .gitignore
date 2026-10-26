@@ -15,3 +15,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.iml
+
+# Blueprints saved with STORAGE_PROVIDER=local
+uploads/
