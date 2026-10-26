@@ -203,6 +203,26 @@ Con `MAIL_PROVIDER=log` los correos no se envían: el enlace aparece en la conso
 3. El enlace abre el frontend (`/confirm-deletion?token=...`), que llama a `/api/projects/deletion/confirm`. La obra desaparece de la lista de inmediato.
 4. Los datos se guardan 30 días por si hubo un error y después una tarea diaria (4:00 a. m., hora de Colombia) los borra para siempre.
 
+## Cómo funcionan los planos y las medidas
+
+- Cada obra puede tener hasta 10 planos de máximo 10 MB: PDF o imagen (PNG, JPG o WEBP). El backend reconoce el tipo por los primeros bytes del archivo, no por el nombre, así que un archivo renombrado a `.pdf` se rechaza.
+- Un PDF con texto (hecho en un programa de dibujo) queda como `vector_pdf`; uno sin texto, como `scanned_pdf`. Las fotos quedan como `image`. Todos empiezan en estado `pending` hasta que la IA los procese (bloque 7).
+- **Patrón Bridge:** los servicios guardan los archivos a través de la interfaz `BlueprintStorage`, sin saber dónde quedan. Hay dos implementaciones:
+  - `DatabaseBlueprintStorage` (`STORAGE_PROVIDER=database`): guarda los bytes en la tabla `blueprint_files` (migración V4). Es la que se usa en Render, porque su plan gratuito borra el disco en cada despliegue.
+  - `LocalBlueprintStorage` (`STORAGE_PROVIDER=local`): guarda los archivos en la carpeta `uploads/`, que no se sube a Git.
+- Cada medida es de un elemento de la obra en un piso. Las medidas que necesita dependen del elemento:
+
+  | Elemento                                   | Unidad | Medidas          | Cantidad calculada        |
+  | ------------------------------------------ | ------ | ---------------- | ------------------------- |
+  | Cimentación, columnas, vigas, losas        | m³     | largo, ancho, alto | largo × ancho × alto × cantidad |
+  | Muros                                      | m²     | largo, alto      | largo × alto × cantidad   |
+  | Piso y cubierta                            | m²     | largo, ancho     | largo × ancho × cantidad  |
+
+- El piso no puede ser mayor que los pisos de la obra. Si falta una medida, la respuesta 400 indica el campo en `fields`.
+- Las medidas leídas por la IA (fuente `ocr`) no se pueden editar ni borrar. La comparación suma cada elemento por piso y marca `match` si la diferencia es de 10 % o menos y `review` si es mayor. Mientras la IA no mida, cada fila sale como `manual_only`.
+- Una obra terminada o cancelada no acepta planos ni medidas nuevas, pero se pueden seguir consultando.
+- Al borrar una obra para siempre (tarea de las 4:00 a. m.) también se borran los archivos de sus planos.
+
 ## Estructura
 
 Arquitectura por capas: controladores → servicios → repositorios → base de datos.
