@@ -34,6 +34,12 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(ex.getCode(), ex.getMessage()));
     }
 
+    @ExceptionHandler(FieldValidationException.class)
+    public ResponseEntity<ErrorResponse> handleFieldValidation(FieldValidationException ex) {
+        return ResponseEntity.badRequest()
+                .body(ErrorResponse.withFields(ex.getCode(), ex.getMessage(), ex.getFields()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
         // One message per field, in the order of the form.
