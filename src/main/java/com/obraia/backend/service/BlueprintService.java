@@ -13,6 +13,7 @@ import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.exception.BadRequestException;
 import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.exception.FileTooLargeException;
+import com.obraia.backend.exception.ResourceNotFoundException;
 import com.obraia.backend.repository.BlueprintRepository;
 import com.obraia.backend.storage.BlueprintStorage;
 import com.obraia.backend.storage.FileTypeDetector;
@@ -27,6 +28,10 @@ import jakarta.persistence.EntityManager;
  */
 @Service
 public class BlueprintService {
+
+    /** Bytes and data of a blueprint, ready to send to the browser. */
+    public record BlueprintFile(String filename, String mimeType, byte[] content) {
+    }
 
     private final BlueprintRepository blueprintRepository;
     private final ProjectAccessService accessService;
@@ -77,6 +82,20 @@ public class BlueprintService {
         // Reads uploaded_at, which the database fills in.
         entityManager.refresh(blueprint);
         return BlueprintResponse.from(blueprint);
+    }
+
+    @Transactional(readOnly = true)
+    public BlueprintFile download(UUID projectId, UUID userId, UUID blueprintId) {
+        Blueprint blueprint = requireBlueprint(projectId, userId, blueprintId);
+        return new BlueprintFile(blueprint.getOriginalFilename(), blueprint.getMimeType(),
+                storage.load(blueprint.getFilePath()));
+    }
+
+    Blueprint requireBlueprint(UUID projectId, UUID userId, UUID blueprintId) {
+        accessService.requireMembership(projectId, userId);
+        return blueprintRepository.findByIdAndProjectId(blueprintId, projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("BLUEPRINT_NOT_FOUND",
+                        "The blueprint " + blueprintId + " does not exist in this project"));
     }
 
     /**
