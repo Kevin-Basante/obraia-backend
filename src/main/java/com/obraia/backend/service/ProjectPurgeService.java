@@ -10,8 +10,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.obraia.backend.config.ProjectProperties;
+import com.obraia.backend.repository.BlueprintRepository;
 import com.obraia.backend.repository.DeletionRequestRepository;
 import com.obraia.backend.repository.ProjectRepository;
+import com.obraia.backend.storage.BlueprintStorage;
 
 /** Removes for good the projects deleted long ago and the deletion links nobody used. */
 @Service
@@ -21,13 +23,18 @@ public class ProjectPurgeService {
 
     private final ProjectRepository projectRepository;
     private final DeletionRequestRepository deletionRequestRepository;
+    private final BlueprintRepository blueprintRepository;
+    private final BlueprintStorage storage;
     private final ProjectProperties properties;
     private final Clock clock;
 
     public ProjectPurgeService(ProjectRepository projectRepository,
-            DeletionRequestRepository deletionRequestRepository, ProjectProperties properties, Clock clock) {
+            DeletionRequestRepository deletionRequestRepository, BlueprintRepository blueprintRepository,
+            BlueprintStorage storage, ProjectProperties properties, Clock clock) {
         this.projectRepository = projectRepository;
         this.deletionRequestRepository = deletionRequestRepository;
+        this.blueprintRepository = blueprintRepository;
+        this.storage = storage;
         this.properties = properties;
         this.clock = clock;
     }
@@ -37,7 +44,10 @@ public class ProjectPurgeService {
     @Transactional
     public void purge() {
         Instant now = Instant.now(clock);
-        int projects = projectRepository.purgeDeletedBefore(now.minus(properties.purgeAfter()));
+        Instant limit = now.minus(properties.purgeAfter());
+        // The blueprint rows go with the project (ON DELETE CASCADE), but their files must be removed here.
+        blueprintRepository.findFilePathsOfProjectsDeletedBefore(limit).forEach(storage::delete);
+        int projects = projectRepository.purgeDeletedBefore(limit);
         int links = deletionRequestRepository.deleteExpired(now);
         log.info("Purge finished: {} deleted projects removed, {} expired deletion links removed", projects, links);
     }
