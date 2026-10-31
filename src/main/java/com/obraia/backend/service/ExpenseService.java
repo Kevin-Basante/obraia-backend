@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.obraia.backend.dto.expense.ExpenseRequest;
 import com.obraia.backend.dto.expense.ExpenseResponse;
+import com.obraia.backend.dto.expense.ExpenseSummaryResponse;
+import com.obraia.backend.dto.project.StatusResponse;
 import com.obraia.backend.entity.budget.BudgetStatus;
 import com.obraia.backend.entity.expense.Expense;
 import com.obraia.backend.entity.expense.ExpenseCategory;
@@ -61,6 +63,22 @@ public class ExpenseService {
         return expenseRepository.findByProjectIdOrderByExpenseDateDescCreatedAtDesc(projectId).stream()
                 .map(ExpenseResponse::from)
                 .toList();
+    }
+
+    /** Total spent, by category, compared with the approved budget. Biggest category first. */
+    @Transactional(readOnly = true)
+    public ExpenseSummaryResponse summary(UUID projectId, UUID userId) {
+        accessService.requireMembership(projectId, userId);
+        List<ExpenseSummaryResponse.CategoryTotal> byCategory = expenseRepository.totalsByCategory(projectId)
+                .stream()
+                .sorted((a, b) -> b.amount().compareTo(a.amount()))
+                .map(total -> new ExpenseSummaryResponse.CategoryTotal(
+                        new StatusResponse(total.category().getCode(), total.category().getLabel()),
+                        total.amount(), total.count()))
+                .toList();
+        return ExpenseSummaryResponse.of(expenseRepository.sumByProjectId(projectId),
+                budgetRepository.findByProjectIdAndStatus(projectId, BudgetStatus.APPROVED).orElse(null),
+                byCategory);
     }
 
     @Transactional

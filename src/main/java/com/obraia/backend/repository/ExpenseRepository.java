@@ -23,4 +23,9 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
     /** Everything spent on the project; 0 without expenses. */
     @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.project.id = :projectId")
     BigDecimal sumByProjectId(@Param("projectId") UUID projectId);
+
+    @Query("""
+            SELECT new com.obraia.backend.repository.ExpenseCategoryTotal(e.category, SUM(e.amount), COUNT(e))
+            FROM Expense e WHERE e.project.id = :projectId GROUP BY e.category""")
+    List<ExpenseCategoryTotal> totalsByCategory(@Param("projectId") UUID projectId);
 }
