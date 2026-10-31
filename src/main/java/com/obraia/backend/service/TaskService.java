@@ -12,7 +12,9 @@ import com.obraia.backend.dto.phase.TaskResponse;
 import com.obraia.backend.entity.phase.Phase;
 import com.obraia.backend.entity.phase.Task;
 import com.obraia.backend.entity.phase.WorkSchedule;
+import com.obraia.backend.entity.phase.WorkStatus;
 import com.obraia.backend.entity.project.Project;
+import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.exception.FieldValidationException;
 import com.obraia.backend.exception.ResourceNotFoundException;
 import com.obraia.backend.repository.PhaseRepository;
@@ -64,6 +66,36 @@ public class TaskService {
         if (!previous.getId().equals(phase.getId())) {
             syncPhase(previous);
         }
+        taskRepository.flush();
+        return views.task(task);
+    }
+
+    /** Its progress reports are deleted with it. */
+    @Transactional
+    public void delete(UUID projectId, UUID userId, UUID taskId) {
+        Project project = accessService.requireProject(projectId, userId);
+        ProjectService.requireEditable(project);
+        Task task = requireTask(projectId, taskId);
+        Phase phase = task.getPhase();
+        taskRepository.delete(task);
+        taskRepository.flush();
+        syncPhase(phase);
+    }
+
+    @Transactional
+    public TaskResponse changeStatus(UUID projectId, UUID userId, UUID taskId, String statusCode) {
+        Project project = accessService.requireProject(projectId, userId);
+        ProjectService.requireEditable(project);
+        Task task = requireTask(projectId, taskId);
+        WorkStatus current = task.getSchedule().getStatus();
+        WorkStatus next = WorkStatus.fromCode(statusCode);
+        if (!current.canChangeTo(next)) {
+            throw new ConflictException("INVALID_STATUS_CHANGE", "A task that is " + current.getCode()
+                    + " cannot change to " + next.getCode() + ". Allowed: " + WorkProgress.allowed(current));
+        }
+        task.getSchedule().changeStatus(next, views.today());
+        taskRepository.flush();
+        syncPhase(task.getPhase());
         taskRepository.flush();
         return views.task(task);
     }
