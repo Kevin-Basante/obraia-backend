@@ -2,7 +2,10 @@ package com.obraia.backend.quotation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -12,8 +15,14 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
+import com.obraia.backend.ai.AiMeasurement;
+import com.obraia.backend.ai.AiServiceClient;
+import com.obraia.backend.ai.AnalysisRequest;
+import com.obraia.backend.ai.BlueprintAnalysis;
 import com.obraia.backend.config.QuotationProperties;
+import com.obraia.backend.entity.blueprint.Blueprint;
 import com.obraia.backend.entity.blueprint.MeasurementSource;
 import com.obraia.backend.entity.budget.BudgetItemType;
 import com.obraia.backend.entity.catalog.ElementType;
@@ -28,9 +37,11 @@ import com.obraia.backend.planning.CommercialUnitCalculatorFactory;
 import com.obraia.backend.planning.HouseCalculatorFactory;
 import com.obraia.backend.planning.ProjectCalculatorFactories;
 import com.obraia.backend.repository.BlueprintMeasurementRepository;
+import com.obraia.backend.repository.BlueprintRepository;
 import com.obraia.backend.repository.MaterialFormulaRepository;
 import com.obraia.backend.repository.PhaseRepository;
 import com.obraia.backend.repository.PhaseTemplateRepository;
+import com.obraia.backend.storage.BlueprintStorage;
 import com.obraia.backend.support.BlueprintFixtures;
 import com.obraia.backend.support.CatalogFixtures;
 import com.obraia.backend.support.ProjectFixtures;
@@ -43,12 +54,18 @@ class QuotationFacadeTest {
             "1600");
 
     private BlueprintMeasurementRepository measurements;
+    private BlueprintRepository blueprints;
+    private BlueprintStorage storage;
+    private AiServiceClient aiService;
     private PhaseRepository phases;
     private QuotationFacade facade;
 
     @BeforeEach
     void setUp() {
         measurements = mock(BlueprintMeasurementRepository.class);
+        blueprints = mock(BlueprintRepository.class);
+        storage = mock(BlueprintStorage.class);
+        aiService = mock(AiServiceClient.class);
         phases = mock(PhaseRepository.class);
         MaterialFormulaRepository formulas = mock(MaterialFormulaRepository.class);
         PhaseTemplateRepository templates = mock(PhaseTemplateRepository.class);
@@ -61,7 +78,8 @@ class QuotationFacadeTest {
                         CatalogFixtures.phase(project.getProjectType(), SizeCategory.SMALL, 2, "Mampostería", 21)));
         ProjectCalculatorFactories factories = new ProjectCalculatorFactories(
                 List.of(new HouseCalculatorFactory(), new CommercialUnitCalculatorFactory()));
-        facade = new QuotationFacade(measurements, formulas, phases, templates, factories,
+        facade = new QuotationFacade(measurements, blueprints, storage, aiService, formulas, phases, templates,
+                factories,
                 new QuotationProperties(new BigDecimal("280000"), new BigDecimal("19")));
     }
 
@@ -137,13 +155,55 @@ class QuotationFacadeTest {
 
         assertEquals(MeasurementSource.OCR, quotation.getMeasurementSource());
         assertEquals(new BigDecimal("8880697.00"), quotation.total());
+        verify(aiService, never()).analyze(any());
+    }
+
+    @Test
+    void withoutMeasurementsTheProxyReadsTheNewestBlueprint() {
+        Blueprint newest = BlueprintFixtures.blueprint(project, "planta.png");
+        when(blueprints.findByProjectIdOrderByUploadedAtDesc(project.getId()))
+                .thenReturn(List.of(newest, BlueprintFixtures.blueprint(project, "viejo.png")));
+        when(storage.load(newest.getFilePath())).thenReturn(BlueprintFixtures.PNG);
+        when(aiService.available()).thenReturn(true);
+        when(aiService.analyze(any())).thenReturn(new BlueprintAnalysis(List.of(
+                new AiMeasurement(ElementType.WALL, 1, new BigDecimal("4.00"), null, new BigDecimal("2.50"), 1,
+                        null),
+                new AiMeasurement(ElementType.WALL, 2, new BigDecimal("4.00"), null, new BigDecimal("2.50"), 1,
+                        null)),
+                List.of(), 0, "gemini-test", false));
+
+        Quotation quotation = facade.quoteProject(project);
+
+        // The second floor is left out: the project has one.
+        assertEquals(MeasurementSource.OCR, quotation.getMeasurementSource());
+        assertEquals(new BigDecimal("8880697.00"), quotation.total());
+        ArgumentCaptor<AnalysisRequest> request = ArgumentCaptor.forClass(AnalysisRequest.class);
+        verify(aiService).analyze(request.capture());
+        assertEquals("planta.png", request.getValue().filename());
+        assertEquals(project.getId(), request.getValue().projectId());
+        assertEquals(1, request.getValue().floors());
+    }
+
+    @Test
+    void withoutMeasurementsAndWithTheAiOffItCannotBeQuoted() {
+        when(blueprints.findByProjectIdOrderByUploadedAtDesc(project.getId()))
+                .thenReturn(List.of(BlueprintFixtures.blueprint(project, "planta.png")));
+        when(aiService.available()).thenReturn(false);
+
+        ConflictException ex = assertThrows(ConflictException.class, () -> facade.quoteProject(project));
+
+        assertEquals("NO_MEASUREMENTS", ex.getCode());
+        verify(aiService, never()).analyze(any());
     }
 
     @Test
     void withoutMeasurementsOrBlueprintsItCannotBeQuoted() {
+        when(aiService.available()).thenReturn(true);
+
         ConflictException ex = assertThrows(ConflictException.class, () -> facade.quoteProject(project));
 
         assertEquals("NO_MEASUREMENTS", ex.getCode());
+        verify(aiService, never()).analyze(any());
     }
 
     @Test

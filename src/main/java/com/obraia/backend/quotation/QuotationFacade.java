@@ -3,10 +3,15 @@ package com.obraia.backend.quotation;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.stereotype.Component;
 
+import com.obraia.backend.ai.AiServiceClient;
+import com.obraia.backend.ai.AnalysisRequest;
+import com.obraia.backend.ai.BlueprintAnalysis;
 import com.obraia.backend.config.QuotationProperties;
+import com.obraia.backend.entity.blueprint.Blueprint;
 import com.obraia.backend.entity.blueprint.BlueprintMeasurement;
 import com.obraia.backend.entity.blueprint.MeasurementSource;
 import com.obraia.backend.entity.catalog.Location;
@@ -18,9 +23,11 @@ import com.obraia.backend.planning.PlannedPhase;
 import com.obraia.backend.planning.ProjectCalculatorFactories;
 import com.obraia.backend.planning.WorkCalendar;
 import com.obraia.backend.repository.BlueprintMeasurementRepository;
+import com.obraia.backend.repository.BlueprintRepository;
 import com.obraia.backend.repository.MaterialFormulaRepository;
 import com.obraia.backend.repository.PhaseRepository;
 import com.obraia.backend.repository.PhaseTemplateRepository;
+import com.obraia.backend.storage.BlueprintStorage;
 
 /**
  * Facade of the quotation: one call, {@link #quoteProject}, hides the
@@ -28,12 +35,16 @@ import com.obraia.backend.repository.PhaseTemplateRepository;
  * of the project type for the quantities of material, takes the transport
  * rate of the city and the working days of the plan, then stacks the cost
  * layers (Decorator). When nobody typed measurements, it uses the ones
- * the AI read.
+ * the AI read, asking the AI service proxy for them if needed:
+ * QuotationFacade → AiServiceProxy → AiServiceAdapter.
  */
 @Component
 public class QuotationFacade {
 
     private final BlueprintMeasurementRepository measurementRepository;
+    private final BlueprintRepository blueprintRepository;
+    private final BlueprintStorage storage;
+    private final AiServiceClient aiService;
     private final MaterialFormulaRepository formulaRepository;
     private final PhaseRepository phaseRepository;
     private final PhaseTemplateRepository templateRepository;
@@ -41,10 +52,14 @@ public class QuotationFacade {
     private final QuotationProperties properties;
 
     public QuotationFacade(BlueprintMeasurementRepository measurementRepository,
+            BlueprintRepository blueprintRepository, BlueprintStorage storage, AiServiceClient aiService,
             MaterialFormulaRepository formulaRepository, PhaseRepository phaseRepository,
             PhaseTemplateRepository templateRepository, ProjectCalculatorFactories factories,
             QuotationProperties properties) {
         this.measurementRepository = measurementRepository;
+        this.blueprintRepository = blueprintRepository;
+        this.storage = storage;
+        this.aiService = aiService;
         this.formulaRepository = formulaRepository;
         this.phaseRepository = phaseRepository;
         this.templateRepository = templateRepository;
@@ -74,7 +89,10 @@ public class QuotationFacade {
         return builder.cost(cost).build();
     }
 
-    /** The manual measurements when there are any; if not, the ones the AI already read. */
+    /**
+     * The manual measurements when there are any. If not, the ones the AI
+     * already read. If not, the AI reads the newest blueprint now.
+     */
     private List<BlueprintMeasurement> measurementsToQuote(Project project, Quotation.Builder builder) {
         List<BlueprintMeasurement> all = measurementRepository.findByProjectIdOrderByCreatedAtAsc(project.getId());
         List<BlueprintMeasurement> manual = ofSource(all, MeasurementSource.MANUAL);
@@ -83,6 +101,9 @@ public class QuotationFacade {
             return manual;
         }
         List<BlueprintMeasurement> read = ofSource(all, MeasurementSource.OCR);
+        if (read.isEmpty()) {
+            read = readNewestBlueprint(project);
+        }
         if (read.isEmpty()) {
             throw new ConflictException("NO_MEASUREMENTS",
                     "Add the measurements of the blueprint, or let the AI read it, before quoting the project");
@@ -94,6 +115,30 @@ public class QuotationFacade {
     private static List<BlueprintMeasurement> ofSource(List<BlueprintMeasurement> measurements,
             MeasurementSource source) {
         return measurements.stream().filter(measurement -> measurement.getSource() == source).toList();
+    }
+
+    /**
+     * Asks the AI service for the measurements of the newest blueprint.
+     * They are only used for this quotation; the analysis endpoint is the
+     * one that saves them. Nothing is read when the AI is off or there are
+     * no blueprints.
+     */
+    private List<BlueprintMeasurement> readNewestBlueprint(Project project) {
+        if (!aiService.available()) {
+            return List.of();
+        }
+        Optional<Blueprint> newest = blueprintRepository.findByProjectIdOrderByUploadedAtDesc(project.getId())
+                .stream().findFirst();
+        if (newest.isEmpty()) {
+            return List.of();
+        }
+        Blueprint blueprint = newest.get();
+        BlueprintAnalysis analysis = aiService.analyze(new AnalysisRequest(project.getId(),
+                blueprint.getOriginalFilename(), storage.load(blueprint.getFilePath()), project.getFloors()));
+        return analysis.measurements().stream()
+                .filter(measurement -> measurement.floorNumber() <= project.getFloors())
+                .map(measurement -> measurement.toEntity(project, blueprint))
+                .toList();
     }
 
     /** From the dates of the phases when all have them; otherwise from the standard plan of the type. */
