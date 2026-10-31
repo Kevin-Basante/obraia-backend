@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.obraia.backend.ai.AiLimitReachedException;
+import com.obraia.backend.ai.AiServiceBusyException;
 import com.obraia.backend.ai.AiServiceDisabledException;
 import com.obraia.backend.ai.AiServiceException;
 import com.obraia.backend.dto.blueprint.BlueprintAnalysisResponse;
@@ -76,6 +77,16 @@ class BlueprintAnalysisControllerTest {
         mvc.perform(post("/api/projects/{id}/blueprints/{blueprintId}/analyze", projectId, blueprintId))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.error.code").value("AI_SERVICE_FAILED"));
+    }
+
+    @Test
+    void busyAiAnswers503() throws Exception {
+        when(analysisService.analyze(projectId, userId, blueprintId)).thenThrow(new AiServiceBusyException(null));
+
+        mvc.perform(post("/api/projects/{id}/blueprints/{blueprintId}/analyze", projectId, blueprintId))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error.code").value("AI_SERVICE_BUSY"))
+                .andExpect(jsonPath("$.error.message").value(AiServiceBusyException.MESSAGE));
     }
 
     @Test
