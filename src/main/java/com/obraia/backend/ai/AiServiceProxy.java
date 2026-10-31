@@ -25,7 +25,7 @@ import com.obraia.backend.config.AiProperties;
  * <ul>
  * <li>Protection: refuses the call when the AI service is not configured
  * and limits how many analyses each project makes, because the free plan
- * of the model has a quota.</li>
+ * of the model has a quota. Only the analyses that work count.</li>
  * <li>Cache: keeps the last analyses by the content of the file, so the
  * same blueprint is not sent twice.</li>
  * <li>Lazy creation: the real adapter (and its HTTP client) is only
@@ -70,14 +70,21 @@ public class AiServiceProxy implements AiServiceClient {
         if (cached != null) {
             return cached.asCached();
         }
-        registerCall(request.projectId());
-        BlueprintAnalysis analysis = adapter().analyze(request);
+        Instant call = registerCall(request.projectId());
+        BlueprintAnalysis analysis;
+        try {
+            analysis = adapter().analyze(request);
+        } catch (AiServiceException ex) {
+            // A failed analysis (for example, the model was busy) does not use up the limit.
+            releaseCall(request.projectId(), call);
+            throw ex;
+        }
         cache.put(key, analysis);
         return analysis;
     }
 
     /** Counts the call, or refuses it when the project used all the calls of the window. */
-    private synchronized void registerCall(UUID projectId) {
+    private synchronized Instant registerCall(UUID projectId) {
         Instant now = clock.instant();
         Instant windowStart = now.minus(properties.limitWindow());
         Deque<Instant> calls = callsByProject.computeIfAbsent(projectId, id -> new ArrayDeque<>());
@@ -88,6 +95,14 @@ public class AiServiceProxy implements AiServiceClient {
             throw new AiLimitReachedException(properties.maxAnalysesPerProject(), properties.limitWindow());
         }
         calls.addLast(now);
+        return now;
+    }
+
+    private synchronized void releaseCall(UUID projectId, Instant call) {
+        Deque<Instant> calls = callsByProject.get(projectId);
+        if (calls != null) {
+            calls.removeLastOccurrence(call);
+        }
     }
 
     private synchronized AiServiceClient adapter() {

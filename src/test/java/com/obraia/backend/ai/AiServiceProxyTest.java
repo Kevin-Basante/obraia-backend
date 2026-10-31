@@ -162,6 +162,17 @@ class AiServiceProxyTest {
         assertFalse(proxy.analyze(request("plano", 1)).cached());
     }
 
+    @Test
+    void failedCallsDoNotCountForTheLimit() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 1, 10);
+        when(adapter.analyze(any())).thenThrow(new AiServiceBusyException(null)).thenReturn(ANSWER);
+
+        assertThrows(AiServiceBusyException.class, () -> proxy.analyze(request("plano", 1)));
+
+        assertFalse(proxy.analyze(request("plano", 1)).cached());
+        verify(adapter, times(2)).analyze(any());
+    }
+
     private AiServiceProxy proxy(String baseUrl, int maxAnalyses, int cacheSize) {
         AiProperties properties = new AiProperties(baseUrl, "secret", Duration.ofSeconds(1), Duration.ofSeconds(1),
                 maxAnalyses, Duration.ofHours(1), cacheSize);
