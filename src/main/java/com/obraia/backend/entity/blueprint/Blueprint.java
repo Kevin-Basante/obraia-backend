@@ -80,6 +80,11 @@ public class Blueprint {
         this.processingStatus = ProcessingStatus.COMPLETED;
     }
 
+    /** The AI could not read the blueprint; it can be analyzed again. */
+    public void markFailed() {
+        this.processingStatus = ProcessingStatus.FAILED;
+    }
+
     public UUID getId() {
         return id;
     }
