@@ -172,6 +172,31 @@ Al arrancar, Flyway crea las tablas y carga los datos iniciales si todavía no e
 | POST   | `/api/projects/{id}/budgets/{presupuestoId}/approve` | Aprobar un borrador; el aprobado anterior queda reemplazado |
 | GET    | `/api/projects/{id}/materials`                     | Materiales de la última cotización, con desperdicio           |
 
+### Gastos (requieren token)
+
+| Método | Ruta                                               | Qué hace                                                      |
+| ------ | -------------------------------------------------- | ------------------------------------------------------------- |
+| GET    | `/api/projects/{id}/expenses`                      | Gastos de la obra, del más nuevo al más viejo                 |
+| GET    | `/api/projects/{id}/expenses/summary`              | Total gastado por categoría, comparado con el presupuesto aprobado |
+| POST   | `/api/projects/{id}/expenses`                      | Registrar un gasto                                            |
+| DELETE | `/api/projects/{id}/expenses/{gastoId}`            | Borrar un gasto registrado por error                          |
+
+### Riesgo (requieren token)
+
+| Método | Ruta                                               | Qué hace                                                      |
+| ------ | -------------------------------------------------- | ------------------------------------------------------------- |
+| GET    | `/api/projects/{id}/risk`                          | Última evaluación de riesgo y la historia del puntaje         |
+| POST   | `/api/projects/{id}/risk/assess`                   | Evaluar el riesgo en este momento                             |
+
+### Notificaciones (requieren token)
+
+| Método | Ruta                                     | Qué hace                                         |
+| ------ | ---------------------------------------- | ------------------------------------------------ |
+| GET    | `/api/notifications`                     | Mis últimas 50 notificaciones, de la más nueva a la más vieja |
+| GET    | `/api/notifications/unread-count`        | Cuántas no he leído (el número de la campana)    |
+| PATCH  | `/api/notifications/{id}/read`           | Marcar una como leída                            |
+| POST   | `/api/notifications/read-all`            | Marcar todas como leídas                         |
+
 ### Maestros de obra (requieren token)
 
 | Método | Ruta                       | Qué hace                         |
