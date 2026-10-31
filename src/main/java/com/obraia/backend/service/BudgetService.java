@@ -26,6 +26,7 @@ import com.obraia.backend.quotation.Quotation;
 import com.obraia.backend.quotation.QuotationFacade;
 import com.obraia.backend.repository.BudgetItemRepository;
 import com.obraia.backend.repository.BudgetRepository;
+import com.obraia.backend.repository.ExpenseRepository;
 import com.obraia.backend.repository.ProjectMaterialRepository;
 
 /**
@@ -38,6 +39,7 @@ public class BudgetService {
     private final BudgetRepository budgetRepository;
     private final BudgetItemRepository itemRepository;
     private final ProjectMaterialRepository materialRepository;
+    private final ExpenseRepository expenseRepository;
     private final QuotationFacade quotationFacade;
     private final BudgetVersions versions;
     private final ProjectAccessService accessService;
@@ -45,11 +47,13 @@ public class BudgetService {
     private final Clock clock;
 
     public BudgetService(BudgetRepository budgetRepository, BudgetItemRepository itemRepository,
-            ProjectMaterialRepository materialRepository, QuotationFacade quotationFacade, BudgetVersions versions,
-            ProjectAccessService accessService, ApplicationEventPublisher events, Clock clock) {
+            ProjectMaterialRepository materialRepository, ExpenseRepository expenseRepository,
+            QuotationFacade quotationFacade, BudgetVersions versions, ProjectAccessService accessService,
+            ApplicationEventPublisher events, Clock clock) {
         this.budgetRepository = budgetRepository;
         this.itemRepository = itemRepository;
         this.materialRepository = materialRepository;
+        this.expenseRepository = expenseRepository;
         this.quotationFacade = quotationFacade;
         this.versions = versions;
         this.accessService = accessService;
@@ -97,7 +101,10 @@ public class BudgetService {
         return BudgetResponse.from(budget, itemRepository.findByBudgetIdOrderBySequenceOrderAsc(budget.getId()));
     }
 
-    /** Approves a draft. The version approved before becomes superseded. */
+    /**
+     * Approves a draft. The version approved before becomes superseded, and
+     * the new one takes the total already spent on the project.
+     */
     @Transactional
     public BudgetResponse approve(UUID projectId, UUID userId, UUID budgetId) {
         Project project = accessService.requireProject(projectId, userId);
@@ -113,6 +120,7 @@ public class BudgetService {
             budgetRepository.saveAndFlush(previous);
         });
         budget.approve(clock.instant());
+        budget.recordActual(expenseRepository.sumByProjectId(projectId));
         budgetRepository.saveAndFlush(budget);
         events.publishEvent(new BudgetChangedEvent(projectId));
         return BudgetResponse.from(budget, itemRepository.findByBudgetIdOrderBySequenceOrderAsc(budgetId));

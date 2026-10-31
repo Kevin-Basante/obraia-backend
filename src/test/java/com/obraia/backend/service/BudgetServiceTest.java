@@ -46,6 +46,7 @@ import com.obraia.backend.quotation.QuotationFacade;
 import com.obraia.backend.quotation.WasteCost;
 import com.obraia.backend.repository.BudgetItemRepository;
 import com.obraia.backend.repository.BudgetRepository;
+import com.obraia.backend.repository.ExpenseRepository;
 import com.obraia.backend.repository.ProjectMaterialRepository;
 import com.obraia.backend.support.BudgetFixtures;
 import com.obraia.backend.support.CatalogFixtures;
@@ -65,6 +66,7 @@ class BudgetServiceTest {
     private BudgetRepository budgets;
     private BudgetItemRepository items;
     private ProjectMaterialRepository materials;
+    private ExpenseRepository expenses;
     private QuotationFacade facade;
     private BudgetVersions versions;
     private ProjectAccessService access;
@@ -76,6 +78,8 @@ class BudgetServiceTest {
         budgets = mock(BudgetRepository.class);
         items = mock(BudgetItemRepository.class);
         materials = mock(ProjectMaterialRepository.class);
+        expenses = mock(ExpenseRepository.class);
+        when(expenses.sumByProjectId(project.getId())).thenReturn(BigDecimal.ZERO);
         facade = mock(QuotationFacade.class);
         versions = mock(BudgetVersions.class);
         access = mock(ProjectAccessService.class);
@@ -83,7 +87,7 @@ class BudgetServiceTest {
         when(access.requireProject(project.getId(), userId)).thenReturn(project);
         when(budgets.save(any())).thenAnswer(call -> call.getArgument(0));
         when(budgets.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
-        service = new BudgetService(budgets, items, materials, facade, versions, access, events, CLOCK);
+        service = new BudgetService(budgets, items, materials, expenses, facade, versions, access, events, CLOCK);
     }
 
     @Test
@@ -181,6 +185,18 @@ class BudgetServiceTest {
 
         assertEquals(BudgetStatus.APPROVED, draft.getStatus());
         verify(budgets, times(1)).saveAndFlush(any());
+    }
+
+    @Test
+    void theApprovedVersionTakesWhatWasAlreadySpent() {
+        Budget draft = BudgetFixtures.budget(project, 1, "1200000");
+        when(budgets.findByIdAndProjectId(draft.getId(), project.getId())).thenReturn(Optional.of(draft));
+        when(budgets.findByProjectIdAndStatus(project.getId(), BudgetStatus.APPROVED)).thenReturn(Optional.empty());
+        when(expenses.sumByProjectId(project.getId())).thenReturn(new BigDecimal("300000.00"));
+
+        BudgetResponse response = service.approve(project.getId(), userId, draft.getId());
+
+        assertEquals(new BigDecimal("300000.00"), response.actualAmount());
     }
 
     @Test
