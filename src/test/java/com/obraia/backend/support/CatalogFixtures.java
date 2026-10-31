@@ -38,6 +38,7 @@ public final class CatalogFixtures {
         set(location, "city", city);
         set(location, "department", department);
         set(location, "country", "Colombia");
+        set(location, "transportPct", new BigDecimal("3.00"));
         return location;
     }
 
