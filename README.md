@@ -326,13 +326,16 @@ src/main/java/com/obraia/backend/
 ├── controller/            Reciben la petición y responden con el código HTTP correcto
 ├── dto/                   Objetos que se reciben y se envían (JSON)
 ├── email/                 Envío de correos (consola o Brevo)
+├── event/                 Eventos de la aplicación (Observer)
 ├── entity/                Tablas de la base de datos como clases Java (JPA)
 ├── entity/blueprint/      Planos, medidas y reglas para calcular cada elemento
+├── entity/budget/         Presupuestos, sus filas y los materiales de cada obra
 ├── entity/catalog/        Catálogos: tipos de obra, ciudades, materiales, fases y fórmulas
 ├── entity/phase/          Fases, tareas, reportes de avance y sus estados
 ├── entity/project/        Obras, miembros, maestros de obra y solicitudes de eliminación
 ├── exception/             Errores de la aplicación y manejador global de errores
-├── planning/              Fábricas por tipo de obra (Factory Method), planificadores y calendario de obra
+├── planning/              Fábricas por tipo de obra (Factory Method), planificadores, calculador de materiales y calendario de obra
+├── quotation/             Cotización: fachada (Facade), capas de costo (Decorator) y resultado (Builder)
 ├── repository/            Acceso a la base de datos (patrón Repository)
 ├── security/              Tokens JWT, hash de tokens y respuestas 401/403 en JSON
 ├── service/               Lógica de negocio
