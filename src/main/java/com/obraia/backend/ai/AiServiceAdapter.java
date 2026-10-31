@@ -9,8 +9,10 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import com.obraia.backend.entity.catalog.ElementType;
 import com.obraia.backend.exception.BadRequestException;
@@ -43,6 +45,10 @@ public class AiServiceAdapter implements AiServiceClient {
                     .body(form(request))
                     .retrieve()
                     .body(AiServicePayload.class);
+        } catch (RestClientResponseException ex) {
+            throw new AiServiceException("The AI service answered " + ex.getStatusCode().value(), ex);
+        } catch (ResourceAccessException ex) {
+            throw new AiServiceException("The AI service could not be reached or did not answer in time", ex);
         } catch (RestClientException ex) {
             throw new AiServiceException("The answer of the AI service could not be read", ex);
         }
