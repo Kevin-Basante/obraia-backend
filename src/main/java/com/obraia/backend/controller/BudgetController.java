@@ -81,4 +81,14 @@ public class BudgetController {
         return budgetService.get(projectId, ProjectController.userId(jwt), budgetId);
     }
 
+    @PostMapping("/{budgetId}/approve")
+    @Operation(summary = "Approve a draft version",
+            description = "The version approved before, if any, becomes superseded.")
+    @ApiResponse(responseCode = "200", description = "Version approved")
+    @ApiResponse(responseCode = "409", description = "The version is not a draft or the project is closed",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public BudgetResponse approve(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId,
+            @PathVariable UUID budgetId) {
+        return budgetService.approve(projectId, ProjectController.userId(jwt), budgetId);
+    }
 }
