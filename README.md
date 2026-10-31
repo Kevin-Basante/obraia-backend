@@ -299,6 +299,22 @@ El backend usa la caché de Spring (`@EnableCaching` en `CacheConfig`) guardada 
 Para borrar `budgetVersions` en el momento correcto se usa el **patrón Observer** con los eventos de Spring: `BudgetService` publica `BudgetChangedEvent` y `BudgetVersions.onBudgetChanged` lo escucha con `@TransactionalEventListener`, que espera a que el cambio quede guardado en la base de datos antes de borrar la caché.
 Además, los catálogos responden con `Cache-Control: max-age=600` para que el navegador también los guarde.
 
+## Patrones de diseño
+
+| Patrón          | Dónde                                                                 |
+| --------------- | --------------------------------------------------------------------- |
+| Facade          | `QuotationFacade`: una sola llamada para cotizar una obra            |
+| Decorator       | `CostComponent`, `MaterialsCost` y los decoradores `WasteCost`, `TransportCost`, `LaborCost`, `TaxCost` |
+| Factory Method  | `ProjectCalculatorFactory` y una fábrica por tipo de obra (planificador de fases y calculador de materiales) |
+| Adapter         | Bloque 7: `AiServiceAdapter` para el servicio de IA en Python        |
+| Proxy           | Bloque 7: `AiServiceProxy` (caché, límite de análisis y carga perezosa) |
+| Builder         | `Quotation.builder()`                                                |
+| Bridge          | `BlueprintStorage` con almacenamiento en base de datos o en carpeta  |
+| Template Method | `StandardPhasePlanner`: el algoritmo del plan es fijo y cada tipo de obra pone sus tareas y fases extra |
+| Strategy        | `EmailSender`: correo por consola o por Brevo según `MAIL_PROVIDER`  |
+| Observer        | `BudgetChangedEvent` y `BudgetVersions` (eventos de Spring)          |
+| Repository, DTO y capas | Repositorios de Spring Data, objetos de `dto/` y controladores → servicios → repositorios |
+
 ## Estructura
 
 Arquitectura por capas: controladores → servicios → repositorios → base de datos.
