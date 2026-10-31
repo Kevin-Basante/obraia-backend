@@ -22,6 +22,7 @@ import org.springframework.util.unit.DataSize;
 
 import com.obraia.backend.ai.AiMeasurement;
 import com.obraia.backend.ai.AiServiceClient;
+import com.obraia.backend.ai.AiServiceException;
 import com.obraia.backend.ai.AnalysisRequest;
 import com.obraia.backend.ai.BlueprintAnalysis;
 import com.obraia.backend.config.StorageProperties;
@@ -145,6 +146,16 @@ class BlueprintAnalysisServiceTest {
         assertEquals(1, saved.size());
         // One discarded by obraia-ia and one here.
         assertEquals(2, response.discarded());
+    }
+
+    @Test
+    void whenTheAiFailsTheBlueprintIsMarkedAsFailed() {
+        when(aiService.analyze(any())).thenThrow(new AiServiceException("The AI service answered 502", null));
+
+        assertThrows(AiServiceException.class, () -> service.analyze(project.getId(), userId, blueprint.getId()));
+
+        assertEquals(ProcessingStatus.FAILED, blueprint.getProcessingStatus());
+        verify(measurements, never()).saveAllAndFlush(any());
     }
 
     @Test
