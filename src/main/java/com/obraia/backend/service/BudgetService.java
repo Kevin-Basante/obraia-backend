@@ -13,9 +13,11 @@ import com.obraia.backend.dto.budget.BudgetSummaryResponse;
 import com.obraia.backend.dto.budget.QuotationResponse;
 import com.obraia.backend.entity.budget.Budget;
 import com.obraia.backend.entity.budget.BudgetItem;
+import com.obraia.backend.entity.budget.BudgetStatus;
 import com.obraia.backend.entity.budget.ProjectMaterial;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.event.BudgetChangedEvent;
+import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.exception.ResourceNotFoundException;
 import com.obraia.backend.quotation.CostLine;
 import com.obraia.backend.quotation.MaterialNeed;
@@ -92,6 +94,27 @@ public class BudgetService {
         budgetRepository.flush();
         events.publishEvent(new BudgetChangedEvent(projectId));
         return BudgetResponse.from(budget, itemRepository.findByBudgetIdOrderBySequenceOrderAsc(budget.getId()));
+    }
+
+    /** Approves a draft. The version approved before becomes superseded. */
+    @Transactional
+    public BudgetResponse approve(UUID projectId, UUID userId, UUID budgetId) {
+        Project project = accessService.requireProject(projectId, userId);
+        ProjectService.requireEditable(project);
+        Budget budget = requireBudget(projectId, budgetId);
+        if (budget.getStatus() != BudgetStatus.DRAFT) {
+            throw new ConflictException("BUDGET_NOT_DRAFT",
+                    "Only a draft can be approved. This version is " + budget.getStatus().getCode());
+        }
+        budgetRepository.findByProjectIdAndStatus(projectId, BudgetStatus.APPROVED).ifPresent(previous -> {
+            previous.supersede();
+            // Saved first: the database allows only one approved budget per project.
+            budgetRepository.saveAndFlush(previous);
+        });
+        budget.approve(clock.instant());
+        budgetRepository.saveAndFlush(budget);
+        events.publishEvent(new BudgetChangedEvent(projectId));
+        return BudgetResponse.from(budget, itemRepository.findByBudgetIdOrderBySequenceOrderAsc(budgetId));
     }
 
     private void replaceMaterials(Project project, List<MaterialNeed> needs) {
