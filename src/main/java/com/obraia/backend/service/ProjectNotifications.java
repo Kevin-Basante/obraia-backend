@@ -17,6 +17,7 @@ import com.obraia.backend.entity.notification.NotificationType;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.entity.risk.RiskLevel;
 import com.obraia.backend.event.BudgetApprovedEvent;
+import com.obraia.backend.event.BudgetExceededEvent;
 import com.obraia.backend.event.RiskAssessedEvent;
 import com.obraia.backend.repository.ProjectRepository;
 
@@ -47,6 +48,13 @@ public class ProjectNotifications {
         notify(event.projectId(), NotificationType.BUDGET_APPROVED, project -> "Version " + event.version()
                 + " of the budget of \"" + project.getName() + "\" was approved for "
                 + money(event.projectedAmount()) + ".");
+    }
+
+    @TransactionalEventListener
+    public void onBudgetExceeded(BudgetExceededEvent event) {
+        notify(event.projectId(), NotificationType.BUDGET_DEVIATION, project -> "The expenses of \""
+                + project.getName() + "\" passed the approved budget: " + money(event.spent()) + " spent of "
+                + money(event.approvedBudget()) + ".");
     }
 
     /** Only when the risk reaches high or critical and is worse than before. */
