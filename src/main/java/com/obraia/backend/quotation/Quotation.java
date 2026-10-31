@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+import com.obraia.backend.entity.blueprint.MeasurementSource;
 import com.obraia.backend.entity.catalog.ElementType;
 
 /**
@@ -26,6 +27,7 @@ public final class Quotation {
     private final BigDecimal transportPct;
     private final int workingDays;
     private final DaysSource daysSource;
+    private final MeasurementSource measurementSource;
     private final List<MaterialNeed> materials;
     private final List<ElementType> elementsWithoutFormulas;
     private final CostComponent cost;
@@ -36,6 +38,7 @@ public final class Quotation {
         this.transportPct = builder.transportPct;
         this.workingDays = builder.workingDays;
         this.daysSource = builder.daysSource;
+        this.measurementSource = builder.measurementSource;
         this.materials = List.copyOf(builder.materials);
         this.elementsWithoutFormulas = List.copyOf(builder.elementsWithoutFormulas);
         this.cost = builder.cost;
@@ -73,6 +76,11 @@ public final class Quotation {
         return daysSource;
     }
 
+    /** MANUAL when the user typed the measurements; OCR when they were read by the AI. */
+    public MeasurementSource getMeasurementSource() {
+        return measurementSource;
+    }
+
     public List<MaterialNeed> getMaterials() {
         return materials;
     }
@@ -93,6 +101,7 @@ public final class Quotation {
         private BigDecimal transportPct;
         private int workingDays;
         private DaysSource daysSource;
+        private MeasurementSource measurementSource = MeasurementSource.MANUAL;
         private List<MaterialNeed> materials = List.of();
         private List<ElementType> elementsWithoutFormulas = List.of();
         private CostComponent cost;
@@ -114,6 +123,11 @@ public final class Quotation {
         public Builder workingDays(int workingDays, DaysSource daysSource) {
             this.workingDays = workingDays;
             this.daysSource = daysSource;
+            return this;
+        }
+
+        public Builder measurementSource(MeasurementSource measurementSource) {
+            this.measurementSource = measurementSource;
             return this;
         }
 
