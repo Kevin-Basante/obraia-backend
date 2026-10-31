@@ -13,6 +13,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import com.obraia.backend.entity.catalog.ElementType;
+import com.obraia.backend.exception.BadRequestException;
 
 /**
  * Adapter between the backend and obraia-ia. The Python service speaks
@@ -64,15 +65,29 @@ public class AiServiceAdapter implements AiServiceClient {
         return form;
     }
 
+    /** Elements with a type the backend does not know are counted as discarded. */
     static BlueprintAnalysis toAnalysis(AiServicePayload payload) {
         List<AiMeasurement> measurements = new ArrayList<>();
+        int discarded = payload.discarded();
         for (AiServicePayload.Item item : payload.measurements()) {
-            measurements.add(new AiMeasurement(ElementType.fromCode(item.elementType()), item.floorNumber(),
-                    meters(item.lengthM()), meters(item.widthM()), meters(item.heightM()), item.quantity(),
-                    item.notes()));
+            ElementType element = elementType(item.elementType());
+            if (element == null) {
+                discarded++;
+                continue;
+            }
+            measurements.add(new AiMeasurement(element, item.floorNumber(), meters(item.lengthM()),
+                    meters(item.widthM()), meters(item.heightM()), item.quantity(), item.notes()));
         }
         List<String> warnings = payload.warnings() == null ? List.of() : payload.warnings();
-        return new BlueprintAnalysis(measurements, warnings, payload.discarded(), payload.model(), false);
+        return new BlueprintAnalysis(measurements, warnings, discarded, payload.model(), false);
+    }
+
+    private static ElementType elementType(String code) {
+        try {
+            return code == null ? null : ElementType.fromCode(code);
+        } catch (BadRequestException ex) {
+            return null;
+        }
     }
 
     /** Meters with two decimals, like the columns of blueprint_measurements. */
