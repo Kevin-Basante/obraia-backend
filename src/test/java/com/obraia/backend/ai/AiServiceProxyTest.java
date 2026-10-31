@@ -109,6 +109,49 @@ class AiServiceProxyTest {
     }
 
     @Test
+    void aProjectCannotPassTheLimitOfTheWindow() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 2, 10);
+        proxy.analyze(request("plano 1", 1));
+        proxy.analyze(request("plano 2", 1));
+
+        AiLimitReachedException ex = assertThrows(AiLimitReachedException.class,
+                () -> proxy.analyze(request("plano 3", 1)));
+
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getStatus());
+        assertEquals("AI_LIMIT_REACHED", ex.getCode());
+        verify(adapter, times(2)).analyze(any());
+    }
+
+    @Test
+    void cachedAnswersDoNotCountForTheLimit() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 1, 10);
+        proxy.analyze(request("plano", 1));
+
+        assertTrue(proxy.analyze(request("plano", 1)).cached());
+    }
+
+    @Test
+    void theLimitIsPerProject() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 1, 10);
+        proxy.analyze(request("plano 1", 1));
+
+        proxy.analyze(new AnalysisRequest(UUID.randomUUID(), "otro.png", bytes("plano 2"), 1));
+
+        verify(adapter, times(2)).analyze(any());
+    }
+
+    @Test
+    void theLimitStartsAgainWhenTheWindowPasses() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 1, 10);
+        proxy.analyze(request("plano 1", 1));
+
+        clock.advance(Duration.ofMinutes(61));
+        proxy.analyze(request("plano 2", 1));
+
+        verify(adapter, times(2)).analyze(any());
+    }
+
+    @Test
     void aFailedCallIsNotCached() {
         AiServiceProxy proxy = proxy("https://obraia-ia.test", 5, 10);
         when(adapter.analyze(any())).thenThrow(new AiServiceException("The AI service answered 502", null))
