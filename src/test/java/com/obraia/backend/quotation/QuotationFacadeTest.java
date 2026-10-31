@@ -74,6 +74,7 @@ class QuotationFacadeTest {
 
         Quotation quotation = facade.quoteProject(project);
 
+        assertEquals(MeasurementSource.MANUAL, quotation.getMeasurementSource());
         assertEquals(Quotation.DaysSource.STANDARD_PLAN, quotation.getDaysSource());
         assertEquals(26, quotation.getWorkingDays());
         assertEquals("Cali", quotation.getCity());
@@ -113,11 +114,33 @@ class QuotationFacadeTest {
     }
 
     @Test
-    void aiMeasurementsAreNotQuotedYet() {
+    void manualMeasurementsWinOverTheOnesOfTheAi() {
+        when(measurements.findByProjectIdOrderByCreatedAtAsc(project.getId())).thenReturn(List.of(
+                BlueprintFixtures.measurement(project, MeasurementSource.OCR, ElementType.WALL, 1, "40", null,
+                        "2.5", 1),
+                BlueprintFixtures.measurement(project, MeasurementSource.MANUAL, ElementType.WALL, 1, "4", null,
+                        "2.5", 1)));
+
+        Quotation quotation = facade.quoteProject(project);
+
+        assertEquals(MeasurementSource.MANUAL, quotation.getMeasurementSource());
+        assertEquals(new BigDecimal("8880697.00"), quotation.total());
+    }
+
+    @Test
+    void withoutManualMeasurementsTheOnesTheAiReadAreQuoted() {
         when(measurements.findByProjectIdOrderByCreatedAtAsc(project.getId())).thenReturn(List.of(
                 BlueprintFixtures.measurement(project, MeasurementSource.OCR, ElementType.WALL, 1, "4", null,
                         "2.5", 1)));
 
+        Quotation quotation = facade.quoteProject(project);
+
+        assertEquals(MeasurementSource.OCR, quotation.getMeasurementSource());
+        assertEquals(new BigDecimal("8880697.00"), quotation.total());
+    }
+
+    @Test
+    void withoutMeasurementsOrBlueprintsItCannotBeQuoted() {
         ConflictException ex = assertThrows(ConflictException.class, () -> facade.quoteProject(project));
 
         assertEquals("NO_MEASUREMENTS", ex.getCode());

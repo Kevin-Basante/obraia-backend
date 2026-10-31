@@ -27,8 +27,8 @@ import com.obraia.backend.repository.PhaseTemplateRepository;
  * parts that take part in it. It reads the measurements, asks the factory
  * of the project type for the quantities of material, takes the transport
  * rate of the city and the working days of the plan, then stacks the cost
- * layers (Decorator). In block 7 the measurements of the AI join through
- * the AI service proxy.
+ * layers (Decorator). When nobody typed measurements, it uses the ones
+ * the AI read.
  */
 @Component
 public class QuotationFacade {
@@ -53,13 +53,8 @@ public class QuotationFacade {
     }
 
     public Quotation quoteProject(Project project) {
-        List<BlueprintMeasurement> measurements = measurementRepository
-                .findByProjectIdOrderByCreatedAtAsc(project.getId()).stream()
-                .filter(measurement -> measurement.getSource() == MeasurementSource.MANUAL).toList();
-        if (measurements.isEmpty()) {
-            throw new ConflictException("NO_MEASUREMENTS",
-                    "Add the measurements of the blueprint before quoting the project");
-        }
+        Quotation.Builder builder = Quotation.builder().projectId(project.getId());
+        List<BlueprintMeasurement> measurements = measurementsToQuote(project, builder);
         MaterialTakeoff takeoff = factories.forType(project.getProjectType()).calculateMaterials(measurements,
                 formulaRepository.findByProjectTypeId(project.getProjectType().getId()));
         if (takeoff.needs().isEmpty()) {
@@ -67,8 +62,7 @@ public class QuotationFacade {
                     "The project type has no material formulas for the measured elements");
         }
         Location location = project.getLocation();
-        Quotation.Builder builder = Quotation.builder().projectId(project.getId())
-                .location(location.getCity(), location.getTransportPct()).takeoff(takeoff);
+        builder.location(location.getCity(), location.getTransportPct()).takeoff(takeoff);
         int workingDays = workingDays(project, builder);
         CostComponent cost = new TaxCost(
                 new LaborCost(
@@ -78,6 +72,28 @@ public class QuotationFacade {
                         workingDays, properties.laborDailyRate()),
                 properties.vatPct());
         return builder.cost(cost).build();
+    }
+
+    /** The manual measurements when there are any; if not, the ones the AI already read. */
+    private List<BlueprintMeasurement> measurementsToQuote(Project project, Quotation.Builder builder) {
+        List<BlueprintMeasurement> all = measurementRepository.findByProjectIdOrderByCreatedAtAsc(project.getId());
+        List<BlueprintMeasurement> manual = ofSource(all, MeasurementSource.MANUAL);
+        if (!manual.isEmpty()) {
+            builder.measurementSource(MeasurementSource.MANUAL);
+            return manual;
+        }
+        List<BlueprintMeasurement> read = ofSource(all, MeasurementSource.OCR);
+        if (read.isEmpty()) {
+            throw new ConflictException("NO_MEASUREMENTS",
+                    "Add the measurements of the blueprint, or let the AI read it, before quoting the project");
+        }
+        builder.measurementSource(MeasurementSource.OCR);
+        return read;
+    }
+
+    private static List<BlueprintMeasurement> ofSource(List<BlueprintMeasurement> measurements,
+            MeasurementSource source) {
+        return measurements.stream().filter(measurement -> measurement.getSource() == source).toList();
     }
 
     /** From the dates of the phases when all have them; otherwise from the standard plan of the type. */
