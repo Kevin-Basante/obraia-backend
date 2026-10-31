@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -66,6 +67,17 @@ public class PhaseController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     public WorkPlanResponse generate(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId) {
         return phaseService.generate(projectId, ProjectController.userId(jwt));
+    }
+
+    @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Delete the plan to create it again",
+            description = "Only while no task has progress reports.")
+    @ApiResponse(responseCode = "204", description = "Phases and tasks deleted")
+    @ApiResponse(responseCode = "409", description = "The project is closed or the plan has progress",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public void reset(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId) {
+        phaseService.reset(projectId, ProjectController.userId(jwt));
     }
 
 }
