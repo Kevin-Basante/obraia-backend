@@ -24,12 +24,13 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.obraia.backend.dto.budget.BudgetItemResponse;
 import com.obraia.backend.dto.budget.BudgetResponse;
+import com.obraia.backend.dto.budget.ProjectMaterialResponse;
 import com.obraia.backend.dto.project.StatusResponse;
 import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.exception.GlobalExceptionHandler;
 import com.obraia.backend.service.BudgetService;
 
-/** HTTP side of the budget routes, without the database. */
+/** HTTP side of the budget and material routes, without the database. */
 class BudgetControllerTest {
 
     private final UUID userId = UUID.randomUUID();
@@ -45,7 +46,7 @@ class BudgetControllerTest {
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
         budgetService = mock(BudgetService.class);
         mvc = MockMvcBuilders
-                .standaloneSetup(new BudgetController(budgetService))
+                .standaloneSetup(new BudgetController(budgetService), new ProjectMaterialController(budgetService))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -76,6 +77,27 @@ class BudgetControllerTest {
         mvc.perform(get("/api/projects/{id}/budgets/preview", projectId))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("NO_MEASUREMENTS"));
+    }
+
+    @Test
+    void approveAnswers200() throws Exception {
+        when(budgetService.approve(projectId, userId, budgetId)).thenReturn(budget("approved", "Approved"));
+
+        mvc.perform(post("/api/projects/{id}/budgets/{budgetId}/approve", projectId, budgetId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status.label").value("Approved"));
+    }
+
+    @Test
+    void materialsAreListedUnderTheProject() throws Exception {
+        when(budgetService.materials(projectId, userId)).thenReturn(List.of(new ProjectMaterialResponse(
+                UUID.randomUUID(), "Gravilla", "m3", new BigDecimal("2.10"), new BigDecimal("115000.00"),
+                new BigDecimal("241500.00"))));
+
+        mvc.perform(get("/api/projects/{id}/materials", projectId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("Gravilla"))
+                .andExpect(jsonPath("$[0].subtotal").value(241500.0));
     }
 
     private BudgetResponse budget(String code, String label) {
