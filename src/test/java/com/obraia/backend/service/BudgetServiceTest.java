@@ -47,6 +47,7 @@ import com.obraia.backend.quotation.WasteCost;
 import com.obraia.backend.repository.BudgetItemRepository;
 import com.obraia.backend.repository.BudgetRepository;
 import com.obraia.backend.repository.ProjectMaterialRepository;
+import com.obraia.backend.support.BudgetFixtures;
 import com.obraia.backend.support.CatalogFixtures;
 import com.obraia.backend.support.ProjectFixtures;
 
@@ -148,6 +149,50 @@ class BudgetServiceTest {
         assertEquals(new BigDecimal("241500.00"), service.preview(project.getId(), userId).projectedAmount());
         verify(budgets, never()).save(any());
         verifyNoInteractions(materials, events);
+    }
+
+    @Test
+    void approvingSupersedesTheVersionApprovedBefore() {
+        Budget previous = BudgetFixtures.approved(project, 1, "1000000");
+        Budget draft = BudgetFixtures.budget(project, 2, "1200000");
+        when(budgets.findByIdAndProjectId(draft.getId(), project.getId())).thenReturn(Optional.of(draft));
+        when(budgets.findByProjectIdAndStatus(project.getId(), BudgetStatus.APPROVED))
+                .thenReturn(Optional.of(previous));
+
+        BudgetResponse response = service.approve(project.getId(), userId, draft.getId());
+
+        assertEquals(BudgetStatus.SUPERSEDED, previous.getStatus());
+        assertEquals("approved", response.status().code());
+        assertEquals(CLOCK.instant(), draft.getApprovedAt());
+        // The old one is saved first: only one budget can be approved.
+        InOrder order = inOrder(budgets);
+        order.verify(budgets).saveAndFlush(previous);
+        order.verify(budgets).saveAndFlush(draft);
+        verify(events).publishEvent(new BudgetChangedEvent(project.getId()));
+    }
+
+    @Test
+    void firstApprovalHasNothingToSupersede() {
+        Budget draft = BudgetFixtures.budget(project, 1, "1200000");
+        when(budgets.findByIdAndProjectId(draft.getId(), project.getId())).thenReturn(Optional.of(draft));
+        when(budgets.findByProjectIdAndStatus(project.getId(), BudgetStatus.APPROVED)).thenReturn(Optional.empty());
+
+        service.approve(project.getId(), userId, draft.getId());
+
+        assertEquals(BudgetStatus.APPROVED, draft.getStatus());
+        verify(budgets, times(1)).saveAndFlush(any());
+    }
+
+    @Test
+    void onlyADraftCanBeApproved() {
+        Budget approved = BudgetFixtures.approved(project, 1, "1000000");
+        when(budgets.findByIdAndProjectId(approved.getId(), project.getId())).thenReturn(Optional.of(approved));
+
+        ConflictException ex = assertThrows(ConflictException.class,
+                () -> service.approve(project.getId(), userId, approved.getId()));
+
+        assertEquals("BUDGET_NOT_DRAFT", ex.getCode());
+        verify(budgets, never()).saveAndFlush(any());
     }
 
     @Test
