@@ -73,6 +73,14 @@ public class RiskAssessmentService {
         return response(save(project, RiskTrigger.MANUAL));
     }
 
+    /**
+     * A new assessment after something changed in the project. It joins the
+     * transaction of the caller, so only code of this package calls it.
+     */
+    void assessAutomatically(Project project, RiskTrigger trigger) {
+        save(project, trigger);
+    }
+
     private RiskAssessment save(Project project, RiskTrigger trigger) {
         UUID projectId = project.getId();
         RiskLevel previous = assessmentRepository.findFirstByProjectIdOrderByAssessedAtDesc(projectId)
