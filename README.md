@@ -288,7 +288,8 @@ BlueprintAnalysisService / QuotationFacade  →  AiServiceProxy  →  AiServiceA
 
 ## Cómo funciona la cotización
 
-- **Patrón Facade:** `QuotationFacade.quoteProject(obra)` es la única llamada que hace el servicio de presupuestos. Por dentro lee las medidas manuales, pide las cantidades a la fábrica del tipo de obra, toma el % de transporte de la ciudad y los días hábiles del plan, y arma las capas de costo. En el bloque 7 se sumarán las medidas de la IA a través del proxy del servicio de IA.
+- **Patrón Facade:** `QuotationFacade.quoteProject(obra)` es la única llamada que hace el servicio de presupuestos. Por dentro elige las medidas, pide las cantidades a la fábrica del tipo de obra, toma el % de transporte de la ciudad y los días hábiles del plan, y arma las capas de costo.
+- **Qué medidas usa:** las manuales si hay; si no, las que la IA ya leyó; si tampoco hay, le pide a la IA (a través de `AiServiceProxy`) que lea el plano más nuevo de la obra. `measurementSource` en la respuesta dice si se cotizó con medidas `manual` u `ocr`.
 - **Cantidades:** para cada elemento medido se suma su cantidad (m³ o m²) y se multiplica por el consumo de cada fórmula de ese elemento (por ejemplo 12,5 bloques por m² de muro). El desperdicio de cada fórmula (5 % o 10 %) se calcula aparte.
 - **Patrón Decorator:** el costo es un `CostComponent`. `MaterialsCost` es el componente base y cada decorador lo envuelve y agrega una capa:
 
@@ -305,7 +306,7 @@ BlueprintAnalysisService / QuotationFacade  →  AiServiceProxy  →  AiServiceA
 - **Patrón Builder:** el resultado (`Quotation`) se arma paso a paso con `Quotation.builder()`, porque tiene muchas partes; `build()` revisa que estén las obligatorias.
 - Cada cotización guardada es una versión nueva en borrador (`draft`) y reemplaza la lista de materiales de la obra (`project_materials`) con el precio de ese momento. Al aprobar una versión, la aprobada antes pasa a `superseded`; la base de datos solo permite un presupuesto aprobado por obra.
 - La migración V5 agrega el % de transporte a cada ciudad y los tipos de fila `waste` y `transport`.
-- Errores: sin medidas manuales responde 409 `NO_MEASUREMENTS`; si ningún elemento medido tiene fórmulas, 409 `NO_MATERIAL_FORMULAS`; aprobar algo que no es borrador, 409 `BUDGET_NOT_DRAFT`.
+- Errores: sin medidas (ni manuales, ni de la IA, ni planos que leer) responde 409 `NO_MEASUREMENTS`; si ningún elemento medido tiene fórmulas, 409 `NO_MATERIAL_FORMULAS`; aprobar algo que no es borrador, 409 `BUDGET_NOT_DRAFT`.
 
 ## Caché
 
