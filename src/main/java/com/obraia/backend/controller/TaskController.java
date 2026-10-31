@@ -1,11 +1,13 @@
 package com.obraia.backend.controller;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,9 +19,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.obraia.backend.config.OpenApiConfig;
 import com.obraia.backend.dto.ErrorResponse;
+import com.obraia.backend.dto.phase.ProgressReportRequest;
+import com.obraia.backend.dto.phase.ProgressReportResponse;
 import com.obraia.backend.dto.phase.TaskRequest;
 import com.obraia.backend.dto.phase.TaskResponse;
 import com.obraia.backend.dto.project.StatusChangeRequest;
+import com.obraia.backend.service.ProgressReportService;
 import com.obraia.backend.service.TaskService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,17 +35,19 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
-/** Tasks of the phases. */
+/** Tasks of the phases and their daily progress reports. */
 @RestController
 @RequestMapping("/api/projects/{projectId}/tasks")
-@Tag(name = "Tasks", description = "Tasks of the phases")
+@Tag(name = "Tasks", description = "Tasks of the phases and their progress reports")
 @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 public class TaskController {
 
     private final TaskService taskService;
+    private final ProgressReportService reportService;
 
-    public TaskController(TaskService taskService) {
+    public TaskController(TaskService taskService, ProgressReportService reportService) {
         this.taskService = taskService;
+        this.reportService = reportService;
     }
 
     @PostMapping
@@ -86,4 +93,27 @@ public class TaskController {
         return taskService.changeStatus(projectId, ProjectController.userId(jwt), taskId, request.status());
     }
 
+    @GetMapping("/{taskId}/progress")
+    @Operation(summary = "Progress reports of a task, newest first")
+    @ApiResponse(responseCode = "200", description = "Reports")
+    @ApiResponse(responseCode = "404", description = "The task does not exist in the project",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public List<ProgressReportResponse> progress(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId,
+            @PathVariable UUID taskId) {
+        return reportService.list(projectId, ProjectController.userId(jwt), taskId);
+    }
+
+    @PostMapping("/{taskId}/progress")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Report the progress of a task",
+            description = "More than 0% starts the task and 100% completes it. Without reportDate it is today.")
+    @ApiResponse(responseCode = "201", description = "Report saved")
+    @ApiResponse(responseCode = "400", description = "Invalid percentage, a future date or no site manager",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "The project is closed",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public ProgressReportResponse report(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId,
+            @PathVariable UUID taskId, @Valid @RequestBody ProgressReportRequest request) {
+        return reportService.create(projectId, ProjectController.userId(jwt), taskId, request);
+    }
 }
