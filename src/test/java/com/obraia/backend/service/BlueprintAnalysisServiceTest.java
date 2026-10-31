@@ -2,6 +2,7 @@ package com.obraia.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -146,6 +147,34 @@ class BlueprintAnalysisServiceTest {
         assertEquals(1, saved.size());
         // One discarded by obraia-ia and one here.
         assertEquals(2, response.discarded());
+    }
+
+    @Test
+    void eachMeasurementKeepsItsDifferenceWithTheManualOnes() {
+        when(aiService.analyze(any())).thenReturn(analysis(List.of(WALL), false));
+        // Manual: 4 m by 2.5 m = 10 m2. AI: 4.4 m by 2.5 m = 11 m2, 10 % more.
+        BlueprintMeasurement manual = BlueprintFixtures.measurement(project, MeasurementSource.MANUAL,
+                ElementType.WALL, 1, "4", null, "2.5", 1);
+        when(measurements.findByProjectIdOrderByCreatedAtAsc(project.getId()))
+                .thenAnswer(call -> {
+                    List<BlueprintMeasurement> all = new ArrayList<>(List.of(manual));
+                    all.addAll(saved);
+                    return all;
+                });
+
+        service.analyze(project.getId(), userId, blueprint.getId());
+
+        assertEquals(new BigDecimal("10.00"), saved.get(0).getDiscrepancyPct());
+    }
+
+    @Test
+    void withoutManualMeasurementsThereIsNoDifference() {
+        when(aiService.analyze(any())).thenReturn(analysis(List.of(WALL), false));
+        when(measurements.findByProjectIdOrderByCreatedAtAsc(project.getId())).thenAnswer(call -> List.copyOf(saved));
+
+        service.analyze(project.getId(), userId, blueprint.getId());
+
+        assertNull(saved.get(0).getDiscrepancyPct());
     }
 
     @Test
