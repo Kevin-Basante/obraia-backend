@@ -365,7 +365,7 @@ BlueprintAnalysisService / QuotationFacade  →  AiServiceProxy  →  AiServiceA
   | Evento                | Lo publica                     | Notificación                                                   |
   | --------------------- | ------------------------------ | -------------------------------------------------------------- |
   | `BudgetApprovedEvent` | `BudgetService` al aprobar     | `budget_approved`: versión aprobada y su valor                 |
-  | `BudgetExceededEvent` | `ExpenseService`               | `budget_deviation`: solo la primera vez que los gastos pasan el presupuesto aprobado |
+  | `BudgetExceededEvent` | `ExpenseService`               | `budget_deviation`: cuando los gastos pasan el presupuesto aprobado; no se repite mientras sigan por encima |
   | `RiskAssessedEvent`   | `RiskAssessmentService`        | `delay_risk`: solo cuando el riesgo llega a `high` o `critical` y subió de nivel |
 
 - Con el mismo patrón, `RiskTriggers` escucha `ExpensesChangedEvent` y `ProgressReportedEvent` para evaluar el riesgo otra vez.
