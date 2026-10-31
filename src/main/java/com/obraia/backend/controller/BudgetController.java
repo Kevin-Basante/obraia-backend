@@ -3,11 +3,14 @@ package com.obraia.backend.controller;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.obraia.backend.config.OpenApiConfig;
@@ -55,6 +58,17 @@ public class BudgetController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     public QuotationResponse preview(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId) {
         return budgetService.preview(projectId, ProjectController.userId(jwt));
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Quote the project and save it as a new draft version",
+            description = "It also replaces the list of materials of the project.")
+    @ApiResponse(responseCode = "201", description = "Draft version created with its rows")
+    @ApiResponse(responseCode = "409", description = "The project is closed or has nothing to quote",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public BudgetResponse create(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId) {
+        return budgetService.create(projectId, ProjectController.userId(jwt));
     }
 
     @GetMapping("/{budgetId}")
