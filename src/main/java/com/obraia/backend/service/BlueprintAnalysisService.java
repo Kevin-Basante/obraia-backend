@@ -13,6 +13,7 @@ import com.obraia.backend.dto.blueprint.BlueprintAnalysisResponse;
 import com.obraia.backend.dto.blueprint.MeasurementResponse;
 import com.obraia.backend.entity.blueprint.Blueprint;
 import com.obraia.backend.entity.blueprint.BlueprintMeasurement;
+import com.obraia.backend.entity.blueprint.MeasurementSource;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.repository.BlueprintMeasurementRepository;
 import com.obraia.backend.storage.BlueprintStorage;
@@ -44,6 +45,7 @@ public class BlueprintAnalysisService {
         this.entityManager = entityManager;
     }
 
+    /** Analyzing again replaces the measurements the AI read before from the same blueprint. */
     @Transactional
     public BlueprintAnalysisResponse analyze(UUID projectId, UUID userId, UUID blueprintId) {
         Blueprint blueprint = blueprintService.requireBlueprint(projectId, userId, blueprintId);
@@ -51,6 +53,8 @@ public class BlueprintAnalysisService {
         ProjectService.requireEditable(project);
         BlueprintAnalysis analysis = aiService.analyze(new AnalysisRequest(projectId,
                 blueprint.getOriginalFilename(), storage.load(blueprint.getFilePath()), project.getFloors()));
+        measurementRepository.deleteAll(
+                measurementRepository.findByBlueprintIdAndSource(blueprintId, MeasurementSource.OCR));
         List<BlueprintMeasurement> saved = analysis.measurements().stream()
                 .map(measurement -> measurement.toEntity(project, blueprint))
                 .toList();
