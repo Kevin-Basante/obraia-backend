@@ -125,6 +125,17 @@ class AiServiceAdapterTest {
 
         assertEquals("AI_SERVICE_FAILED", ex.getCode());
         assertEquals(HttpStatus.BAD_GATEWAY, ex.getStatus());
+        assertEquals("The AI service answered 502: Gemini answered 429", ex.getMessage());
+    }
+
+    @Test
+    void errorPageThatIsNotJsonKeepsOnlyTheStatus() {
+        server.expect(requestTo(URL + AiServiceAdapter.ANALYZE_PATH)).andRespond(withStatus(HttpStatus.BAD_GATEWAY)
+                .contentType(MediaType.TEXT_HTML)
+                .body("<html>Bad gateway</html>"));
+
+        AiServiceException ex = assertThrows(AiServiceException.class, () -> adapter.analyze(REQUEST));
+
         assertEquals("The AI service answered 502", ex.getMessage());
     }
 

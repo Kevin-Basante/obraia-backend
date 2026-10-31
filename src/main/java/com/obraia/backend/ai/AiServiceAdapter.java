@@ -60,7 +60,7 @@ public class AiServiceAdapter implements AiServiceClient {
                     .retrieve()
                     .body(AiServicePayload.class);
         } catch (RestClientResponseException ex) {
-            throw new AiServiceException("The AI service answered " + ex.getStatusCode().value(), ex);
+            throw failure(ex);
         } catch (ResourceAccessException ex) {
             throw new AiServiceException("The AI service could not be reached or did not answer in time", ex);
         } catch (RestClientException ex) {
@@ -70,6 +70,26 @@ public class AiServiceAdapter implements AiServiceClient {
             throw new AiServiceException("The AI service answered without measurements", null);
         }
         return toAnalysis(payload);
+    }
+
+    /** The error of obraia-ia, with its own message when it sent one. */
+    private static AiServiceException failure(RestClientResponseException ex) {
+        String message = "The AI service answered " + ex.getStatusCode().value();
+        AiServiceError.Body error = errorBody(ex);
+        if (error != null && error.message() != null && !error.message().isBlank()) {
+            message += ": " + error.message();
+        }
+        return new AiServiceException(message, ex);
+    }
+
+    /** The error body, or null when it is not the JSON of obraia-ia (for example, a page of Render). */
+    private static AiServiceError.Body errorBody(RestClientResponseException ex) {
+        try {
+            AiServiceError body = ex.getResponseBodyAs(AiServiceError.class);
+            return body == null ? null : body.error();
+        } catch (RuntimeException notJson) {
+            return null;
+        }
     }
 
     private static MultiValueMap<String, Object> form(AnalysisRequest request) {
