@@ -3,6 +3,7 @@ package com.obraia.backend.ai;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
@@ -15,6 +16,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import java.math.BigDecimal;
 import java.net.SocketTimeoutException;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,6 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import com.obraia.backend.config.AiProperties;
 import com.obraia.backend.entity.catalog.ElementType;
 import com.obraia.backend.support.BlueprintFixtures;
 
@@ -151,5 +154,11 @@ class AiServiceAdapterTest {
         AiServiceException ex = assertThrows(AiServiceException.class, () -> adapter.analyze(REQUEST));
 
         assertEquals("The AI service answered without measurements", ex.getMessage());
+    }
+
+    @Test
+    void createBuildsTheAdapterFromTheSettings() {
+        assertNotNull(AiServiceAdapter.create(new AiProperties(URL, "secret", Duration.ofSeconds(1),
+                Duration.ofSeconds(2), 5, Duration.ofHours(1), 10)));
     }
 }
