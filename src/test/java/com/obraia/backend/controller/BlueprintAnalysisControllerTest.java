@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,6 +20,8 @@ import org.springframework.security.web.method.annotation.AuthenticationPrincipa
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import com.obraia.backend.ai.AiLimitReachedException;
+import com.obraia.backend.ai.AiServiceDisabledException;
 import com.obraia.backend.ai.AiServiceException;
 import com.obraia.backend.dto.blueprint.BlueprintAnalysisResponse;
 import com.obraia.backend.dto.project.StatusResponse;
@@ -73,5 +76,26 @@ class BlueprintAnalysisControllerTest {
         mvc.perform(post("/api/projects/{id}/blueprints/{blueprintId}/analyze", projectId, blueprintId))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.error.code").value("AI_SERVICE_FAILED"));
+    }
+
+    @Test
+    void limitReachedAnswers429() throws Exception {
+        when(analysisService.analyze(projectId, userId, blueprintId))
+                .thenThrow(new AiLimitReachedException(5, Duration.ofHours(1)));
+
+        mvc.perform(post("/api/projects/{id}/blueprints/{blueprintId}/analyze", projectId, blueprintId))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.error.code").value("AI_LIMIT_REACHED"))
+                .andExpect(jsonPath("$.error.message")
+                        .value("A project can analyze up to 5 blueprints every 60 minutes. Try again later"));
+    }
+
+    @Test
+    void disabledAiAnswers503() throws Exception {
+        when(analysisService.analyze(projectId, userId, blueprintId)).thenThrow(new AiServiceDisabledException());
+
+        mvc.perform(post("/api/projects/{id}/blueprints/{blueprintId}/analyze", projectId, blueprintId))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error.code").value("AI_SERVICE_DISABLED"));
     }
 }
