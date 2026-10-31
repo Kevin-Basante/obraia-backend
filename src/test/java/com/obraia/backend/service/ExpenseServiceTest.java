@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -23,12 +24,16 @@ import com.obraia.backend.dto.expense.ExpenseRequest;
 import com.obraia.backend.dto.expense.ExpenseResponse;
 import com.obraia.backend.entity.expense.Expense;
 import com.obraia.backend.entity.expense.ExpenseCategory;
+import com.obraia.backend.entity.phase.Phase;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.entity.project.ProjectStatus;
 import com.obraia.backend.exception.BadRequestException;
 import com.obraia.backend.exception.ConflictException;
+import com.obraia.backend.exception.FieldValidationException;
 import com.obraia.backend.repository.ExpenseRepository;
+import com.obraia.backend.repository.PhaseRepository;
 import com.obraia.backend.repository.UserRepository;
+import com.obraia.backend.support.PhaseFixtures;
 import com.obraia.backend.support.ProjectFixtures;
 import com.obraia.backend.support.TestUsers;
 
@@ -40,20 +45,24 @@ class ExpenseServiceTest {
 
     private final UUID userId = UUID.randomUUID();
     private final Project project = ProjectFixtures.project(userId, "Casa Gastos");
+    private final Phase phase = PhaseFixtures.phase(project, 1, "Cimentación");
 
     private ExpenseRepository expenses;
+    private PhaseRepository phases;
     private ProjectAccessService access;
     private ExpenseService service;
 
     @BeforeEach
     void setUp() {
         expenses = mock(ExpenseRepository.class);
+        phases = mock(PhaseRepository.class);
         access = mock(ProjectAccessService.class);
         UserRepository users = mock(UserRepository.class);
         when(access.requireProject(project.getId(), userId)).thenReturn(project);
         when(users.getReferenceById(userId)).thenReturn(TestUsers.verifiedUser("hash"));
         when(expenses.save(any())).thenAnswer(call -> call.getArgument(0));
-        service = new ExpenseService(expenses, users, access, CLOCK);
+        when(phases.findByIdAndProjectId(phase.getId(), project.getId())).thenReturn(Optional.of(phase));
+        service = new ExpenseService(expenses, phases, users, access, CLOCK);
     }
 
     private static ExpenseRequest request(String category, String amount, LocalDate date) {
@@ -77,6 +86,30 @@ class ExpenseServiceTest {
         LocalDate date = LocalDate.of(2026, 11, 3);
 
         assertEquals(date, service.create(project.getId(), userId, request("labor", "1", date)).expenseDate());
+    }
+
+    @Test
+    void expenseCanBelongToAPhaseOfTheProject() {
+        ExpenseRequest request = new ExpenseRequest("labor", "Excavación", new BigDecimal("400000"), null,
+                phase.getId());
+
+        ExpenseResponse response = service.create(project.getId(), userId, request);
+
+        assertEquals(phase.getId(), response.phaseId());
+        assertEquals("Cimentación", response.phaseName());
+    }
+
+    @Test
+    void phaseOfAnotherProjectAndFutureDateAreRejected() {
+        ExpenseRequest request = new ExpenseRequest("labor", "Excavación", new BigDecimal("400000"),
+                TODAY.plusDays(1), UUID.randomUUID());
+
+        FieldValidationException ex = assertThrows(FieldValidationException.class,
+                () -> service.create(project.getId(), userId, request));
+
+        assertEquals("cannot be in the future", ex.getFields().get("expenseDate"));
+        assertEquals("is not a phase of this project", ex.getFields().get("phaseId"));
+        verify(expenses, never()).save(any());
     }
 
     @Test
