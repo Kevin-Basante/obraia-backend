@@ -94,6 +94,21 @@ class AiServiceAdapterTest {
     }
 
     @Test
+    void unknownElementsAreCountedAsDiscarded() {
+        server.expect(requestTo(URL + AiServiceAdapter.ANALYZE_PATH)).andRespond(withSuccess("""
+                {"measurements": [{"element_type": "stairs", "floor_number": 1, "length_m": 3.0,
+                  "width_m": 1.0, "height_m": 2.6, "quantity": 1, "notes": null}],
+                 "warnings": null, "discarded": 0, "model": "gemini-test", "elapsed_ms": 5}
+                """, MediaType.APPLICATION_JSON));
+
+        BlueprintAnalysis analysis = adapter.analyze(REQUEST);
+
+        assertEquals(0, analysis.measurements().size());
+        assertEquals(1, analysis.discarded());
+        assertEquals(List.of(), analysis.warnings());
+    }
+
+    @Test
     void answerThatIsNotJsonBecomesAiServiceFailed() {
         server.expect(requestTo(URL + AiServiceAdapter.ANALYZE_PATH))
                 .andRespond(withSuccess("<html>Service waking up</html>", MediaType.APPLICATION_JSON));
