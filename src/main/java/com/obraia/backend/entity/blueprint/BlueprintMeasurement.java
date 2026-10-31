@@ -58,7 +58,7 @@ public class BlueprintMeasurement {
     @Column(name = "source", nullable = false, length = 10, updatable = false)
     private MeasurementSource source;
 
-    /** Difference with the other source, in percent. Filled when the AI measures (block 7). */
+    /** Difference with the other source, in percent. Filled when the AI measures. */
     @Column(name = "discrepancy_pct", precision = 6, scale = 2)
     private BigDecimal discrepancyPct;
 
@@ -88,6 +88,14 @@ public class BlueprintMeasurement {
         this.heightM = heightM;
         this.quantity = quantity;
         this.notes = notes;
+    }
+
+    /**
+     * Difference, in percent, between what the AI read and what was typed
+     * for the same element and floor; null when there is nothing to compare.
+     */
+    public void updateDiscrepancy(BigDecimal discrepancyPct) {
+        this.discrepancyPct = discrepancyPct;
     }
 
     /** Amount in the base unit of the element (m3 or m2). */
