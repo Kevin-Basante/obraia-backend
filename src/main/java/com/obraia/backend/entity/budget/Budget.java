@@ -41,7 +41,7 @@ public class Budget {
     @Column(name = "projected_amount", nullable = false, precision = 14, scale = 2, updatable = false)
     private BigDecimal projectedAmount;
 
-    /** What was really spent. It stays at 0 until expenses are recorded (block 8). */
+    /** What was really spent: the sum of the expenses, kept up to date on the approved version. */
     @Column(name = "actual_amount", nullable = false, precision = 14, scale = 2)
     private BigDecimal actualAmount;
 
@@ -72,6 +72,14 @@ public class Budget {
 
     public void supersede() {
         this.status = BudgetStatus.SUPERSEDED;
+    }
+
+    /** The total of the expenses of the project. A negative total is a programming error. */
+    public void recordActual(BigDecimal spent) {
+        if (spent.signum() < 0) {
+            throw new IllegalArgumentException("The spent amount cannot be negative: " + spent);
+        }
+        this.actualAmount = spent;
     }
 
     public UUID getId() {
