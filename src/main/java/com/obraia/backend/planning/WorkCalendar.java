@@ -38,4 +38,15 @@ public final class WorkCalendar {
     public static LocalDate nextWorkingDay(LocalDate date) {
         return firstWorkingDayFrom(date.plusDays(1));
     }
+
+    /** Working days from {@code start} to {@code end}, both included. */
+    public static int workingDaysBetween(LocalDate start, LocalDate end) {
+        int days = 0;
+        for (LocalDate day = start; !day.isAfter(end); day = day.plusDays(1)) {
+            if (isWorkingDay(day)) {
+                days++;
+            }
+        }
+        return days;
+    }
 }
