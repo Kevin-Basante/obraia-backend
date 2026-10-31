@@ -17,6 +17,7 @@ import com.obraia.backend.entity.budget.BudgetItem;
 import com.obraia.backend.entity.budget.BudgetStatus;
 import com.obraia.backend.entity.budget.ProjectMaterial;
 import com.obraia.backend.entity.project.Project;
+import com.obraia.backend.event.BudgetApprovedEvent;
 import com.obraia.backend.event.BudgetChangedEvent;
 import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.exception.ResourceNotFoundException;
@@ -123,6 +124,7 @@ public class BudgetService {
         budget.recordActual(expenseRepository.sumByProjectId(projectId));
         budgetRepository.saveAndFlush(budget);
         events.publishEvent(new BudgetChangedEvent(projectId));
+        events.publishEvent(new BudgetApprovedEvent(projectId, budget.getVersion(), budget.getProjectedAmount()));
         return BudgetResponse.from(budget, itemRepository.findByBudgetIdOrderBySequenceOrderAsc(budgetId));
     }
 

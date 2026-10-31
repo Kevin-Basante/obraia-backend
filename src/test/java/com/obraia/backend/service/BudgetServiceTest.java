@@ -35,6 +35,7 @@ import com.obraia.backend.entity.budget.ProjectMaterial;
 import com.obraia.backend.entity.catalog.MaterialCategory;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.entity.project.ProjectStatus;
+import com.obraia.backend.event.BudgetApprovedEvent;
 import com.obraia.backend.event.BudgetChangedEvent;
 import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.exception.ResourceNotFoundException;
@@ -173,6 +174,7 @@ class BudgetServiceTest {
         order.verify(budgets).saveAndFlush(previous);
         order.verify(budgets).saveAndFlush(draft);
         verify(events).publishEvent(new BudgetChangedEvent(project.getId()));
+        verify(events).publishEvent(new BudgetApprovedEvent(project.getId(), 2, new BigDecimal("1200000")));
     }
 
     @Test
