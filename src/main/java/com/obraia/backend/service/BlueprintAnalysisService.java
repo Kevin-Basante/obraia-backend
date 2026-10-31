@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.obraia.backend.ai.AiServiceClient;
+import com.obraia.backend.ai.AiServiceException;
 import com.obraia.backend.ai.AnalysisRequest;
 import com.obraia.backend.ai.BlueprintAnalysis;
 import com.obraia.backend.dto.blueprint.BlueprintAnalysisResponse;
@@ -45,14 +46,24 @@ public class BlueprintAnalysisService {
         this.entityManager = entityManager;
     }
 
-    /** Analyzing again replaces the measurements the AI read before from the same blueprint. */
-    @Transactional
+    /**
+     * Analyzing again replaces the measurements the AI read before from
+     * the same blueprint. If the AI fails, the blueprint is left as failed
+     * (that change is kept) and it can be analyzed again.
+     */
+    @Transactional(noRollbackFor = AiServiceException.class)
     public BlueprintAnalysisResponse analyze(UUID projectId, UUID userId, UUID blueprintId) {
         Blueprint blueprint = blueprintService.requireBlueprint(projectId, userId, blueprintId);
         Project project = blueprint.getProject();
         ProjectService.requireEditable(project);
-        BlueprintAnalysis analysis = aiService.analyze(new AnalysisRequest(projectId,
-                blueprint.getOriginalFilename(), storage.load(blueprint.getFilePath()), project.getFloors()));
+        BlueprintAnalysis analysis;
+        try {
+            analysis = aiService.analyze(new AnalysisRequest(projectId, blueprint.getOriginalFilename(),
+                    storage.load(blueprint.getFilePath()), project.getFloors()));
+        } catch (AiServiceException ex) {
+            blueprint.markFailed();
+            throw ex;
+        }
         measurementRepository.deleteAll(
                 measurementRepository.findByBlueprintIdAndSource(blueprintId, MeasurementSource.OCR));
         List<BlueprintMeasurement> saved = analysis.measurements().stream()
