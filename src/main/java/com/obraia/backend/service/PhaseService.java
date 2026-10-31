@@ -9,14 +9,18 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.obraia.backend.dto.phase.PhaseRequest;
+import com.obraia.backend.dto.phase.PhaseResponse;
 import com.obraia.backend.dto.phase.PlanPreviewResponse;
 import com.obraia.backend.dto.phase.PlannedPhaseResponse;
 import com.obraia.backend.dto.phase.WorkPlanResponse;
 import com.obraia.backend.entity.phase.Phase;
 import com.obraia.backend.entity.phase.Task;
 import com.obraia.backend.entity.phase.WorkSchedule;
+import com.obraia.backend.entity.phase.WorkStatus;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.exception.ConflictException;
+import com.obraia.backend.exception.ResourceNotFoundException;
 import com.obraia.backend.planning.PlannedPhase;
 import com.obraia.backend.planning.ProjectCalculatorFactories;
 import com.obraia.backend.repository.PhaseRepository;
@@ -105,6 +109,45 @@ public class PhaseService {
                     "The plan has progress reports, so it cannot be deleted");
         }
         phaseRepository.deleteByProjectId(projectId);
+    }
+
+    @Transactional
+    public PhaseResponse update(UUID projectId, UUID userId, UUID phaseId, PhaseRequest request) {
+        Project project = accessService.requireProject(projectId, userId);
+        ProjectService.requireEditable(project);
+        Phase phase = requirePhase(projectId, phaseId);
+        phase.rename(request.name().strip());
+        phase.getSchedule().plan(request.plannedStartDate(), request.plannedEndDate());
+        phaseRepository.saveAndFlush(phase);
+        return views.phase(phase);
+    }
+
+    /** A phase can only be completed when all its tasks are. */
+    @Transactional
+    public PhaseResponse changeStatus(UUID projectId, UUID userId, UUID phaseId, String statusCode) {
+        Project project = accessService.requireProject(projectId, userId);
+        ProjectService.requireEditable(project);
+        Phase phase = requirePhase(projectId, phaseId);
+        WorkStatus current = phase.getSchedule().getStatus();
+        WorkStatus next = WorkStatus.fromCode(statusCode);
+        if (!current.canChangeTo(next)) {
+            throw new ConflictException("INVALID_STATUS_CHANGE", "A phase that is " + current.getCode()
+                    + " cannot change to " + next.getCode() + ". Allowed: " + WorkProgress.allowed(current));
+        }
+        if (next == WorkStatus.COMPLETED && taskRepository.findByPhaseId(phaseId).stream()
+                .anyMatch(task -> task.getSchedule().getStatus() != WorkStatus.COMPLETED)) {
+            throw new ConflictException("PHASE_HAS_OPEN_TASKS",
+                    "Complete every task of the phase before completing it");
+        }
+        phase.getSchedule().changeStatus(next, views.today());
+        phaseRepository.saveAndFlush(phase);
+        return views.phase(phase);
+    }
+
+    Phase requirePhase(UUID projectId, UUID phaseId) {
+        return phaseRepository.findByIdAndProjectId(phaseId, projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("PHASE_NOT_FOUND",
+                        "The phase " + phaseId + " does not exist in this project"));
     }
 
     private List<PlannedPhase> plannedPhases(Project project) {
