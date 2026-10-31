@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ import com.obraia.backend.entity.phase.WorkSchedule;
 import com.obraia.backend.entity.phase.WorkStatus;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.entity.project.SiteManager;
+import com.obraia.backend.event.ProgressReportedEvent;
 import com.obraia.backend.exception.FieldValidationException;
 import com.obraia.backend.repository.ProgressReportRepository;
 import com.obraia.backend.repository.UserRepository;
@@ -39,16 +41,18 @@ public class ProgressReportService {
     private final ProjectAccessService accessService;
     private final WorkPlanViews views;
     private final EntityManager entityManager;
+    private final ApplicationEventPublisher events;
 
     public ProgressReportService(ProgressReportRepository reportRepository, UserRepository userRepository,
             TaskService taskService, ProjectAccessService accessService, WorkPlanViews views,
-            EntityManager entityManager) {
+            EntityManager entityManager, ApplicationEventPublisher events) {
         this.reportRepository = reportRepository;
         this.userRepository = userRepository;
         this.taskService = taskService;
         this.accessService = accessService;
         this.views = views;
         this.entityManager = entityManager;
+        this.events = events;
     }
 
     /** Newest first. */
@@ -88,6 +92,7 @@ public class ProgressReportService {
         moveTask(task, request.completionPercentage(), today);
         // Reads created_at, which the database fills in.
         entityManager.refresh(report);
+        events.publishEvent(new ProgressReportedEvent(projectId));
         return ProgressReportResponse.from(report);
     }
 

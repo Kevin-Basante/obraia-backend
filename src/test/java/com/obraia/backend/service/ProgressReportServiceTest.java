@@ -21,6 +21,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.obraia.backend.dto.phase.ProgressReportRequest;
 import com.obraia.backend.dto.phase.ProgressReportResponse;
@@ -29,6 +30,7 @@ import com.obraia.backend.entity.phase.Task;
 import com.obraia.backend.entity.phase.WorkStatus;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.entity.project.SiteManager;
+import com.obraia.backend.event.ProgressReportedEvent;
 import com.obraia.backend.exception.FieldValidationException;
 import com.obraia.backend.exception.ResourceNotFoundException;
 import com.obraia.backend.repository.PhaseRepository;
@@ -54,12 +56,14 @@ class ProgressReportServiceTest {
 
     private ProgressReportRepository reports;
     private TaskRepository tasks;
+    private ApplicationEventPublisher events;
     private ProgressReportService service;
 
     @BeforeEach
     void setUp() {
         reports = mock(ProgressReportRepository.class);
         tasks = mock(TaskRepository.class);
+        events = mock(ApplicationEventPublisher.class);
         PhaseRepository phases = mock(PhaseRepository.class);
         UserRepository users = mock(UserRepository.class);
         ProjectAccessService access = mock(ProjectAccessService.class);
@@ -70,7 +74,8 @@ class ProgressReportServiceTest {
         when(users.getReferenceById(userId)).thenReturn(TestUsers.verifiedUser("hash"));
         WorkPlanViews views = new WorkPlanViews(phases, tasks, reports, CLOCK);
         TaskService taskService = new TaskService(tasks, phases, access, views, CLOCK);
-        service = new ProgressReportService(reports, users, taskService, access, views, mock(EntityManager.class));
+        service = new ProgressReportService(reports, users, taskService, access, views, mock(EntityManager.class),
+                events);
     }
 
     private ProgressReportResponse report(String percentage) {
@@ -87,6 +92,13 @@ class ProgressReportServiceTest {
         assertEquals(WorkStatus.IN_PROGRESS, task.getSchedule().getStatus());
         assertEquals(TODAY, task.getSchedule().getActualStartDate());
         assertEquals(WorkStatus.IN_PROGRESS, phase.getSchedule().getStatus());
+    }
+
+    @Test
+    void eachReportIsAnnounced() {
+        report("40.00");
+
+        verify(events).publishEvent(new ProgressReportedEvent(project.getId()));
     }
 
     @Test
