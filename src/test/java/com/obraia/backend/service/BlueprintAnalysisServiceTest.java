@@ -120,6 +120,21 @@ class BlueprintAnalysisServiceTest {
     }
 
     @Test
+    void analyzingAgainReplacesWhatTheAiReadBefore() {
+        List<BlueprintMeasurement> previous = List.of(
+                BlueprintFixtures.measurement(project, MeasurementSource.OCR, ElementType.WALL, 1, "3", null, "2.4",
+                        1));
+        when(measurements.findByBlueprintIdAndSource(blueprint.getId(), MeasurementSource.OCR)).thenReturn(previous);
+        when(aiService.analyze(any())).thenReturn(analysis(List.of(WALL), true));
+
+        BlueprintAnalysisResponse response = service.analyze(project.getId(), userId, blueprint.getId());
+
+        verify(measurements).deleteAll(previous);
+        assertEquals(1, saved.size());
+        assertEquals(true, response.cached());
+    }
+
+    @Test
     void blueprintOfAnotherProjectIsNotFound() {
         assertThrows(ResourceNotFoundException.class,
                 () -> service.analyze(project.getId(), userId, UUID.randomUUID()));
