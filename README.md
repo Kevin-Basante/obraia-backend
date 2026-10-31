@@ -344,7 +344,8 @@ Arquitectura por capas: controladores → servicios → repositorios → base de
 ```
 database/                  Diagrama entidad-relación y documentación de la base
 src/main/java/com/obraia/backend/
-├── config/                Seguridad, JWT, CORS, correo, almacenamiento, Swagger y propiedades
+├── ai/                    Servicio de IA: interfaz, adaptador (Adapter), proxy (Proxy) y resultados
+├── config/                Seguridad, JWT, CORS, correo, almacenamiento, IA, Swagger y propiedades
 ├── controller/            Reciben la petición y responden con el código HTTP correcto
 ├── dto/                   Objetos que se reciben y se envían (JSON)
 ├── email/                 Envío de correos (consola o Brevo)
