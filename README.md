@@ -397,8 +397,8 @@ Además, los catálogos responden con `Cache-Control: max-age=600` para que el n
 | Builder         | `Quotation.builder()`                                                |
 | Bridge          | `BlueprintStorage` con almacenamiento en base de datos o en carpeta  |
 | Template Method | `StandardPhasePlanner`: el algoritmo del plan es fijo y cada tipo de obra pone sus tareas y fases extra |
-| Strategy        | `EmailSender`: correo por consola o por Brevo según `MAIL_PROVIDER`  |
-| Observer        | `BudgetChangedEvent` y `BudgetVersions` (eventos de Spring)          |
+| Strategy        | `RiskStrategy`: cuatro reglas de riesgo que `RiskEvaluator` combina; también `EmailSender` (consola o Brevo según `MAIL_PROVIDER`) |
+| Observer        | Eventos de Spring: `RiskTriggers` evalúa el riesgo tras gastos y avances, `ProjectNotifications` avisa a los miembros y `BudgetVersions` borra la caché |
 | Repository, DTO y capas | Repositorios de Spring Data, objetos de `dto/` y controladores → servicios → repositorios |
 
 ## Estructura
@@ -418,12 +418,16 @@ src/main/java/com/obraia/backend/
 ├── entity/blueprint/      Planos, medidas y reglas para calcular cada elemento
 ├── entity/budget/         Presupuestos, sus filas y los materiales de cada obra
 ├── entity/catalog/        Catálogos: tipos de obra, ciudades, materiales, fases y fórmulas
+├── entity/expense/        Gastos y sus categorías
+├── entity/notification/   Notificaciones y sus tipos
 ├── entity/phase/          Fases, tareas, reportes de avance y sus estados
 ├── entity/project/        Obras, miembros, maestros de obra y solicitudes de eliminación
+├── entity/risk/           Evaluaciones de riesgo, niveles y qué las disparó
 ├── exception/             Errores de la aplicación y manejador global de errores
 ├── planning/              Fábricas por tipo de obra (Factory Method), planificadores, calculador de materiales y calendario de obra
 ├── quotation/             Cotización: fachada (Facade), capas de costo (Decorator) y resultado (Builder)
 ├── repository/            Acceso a la base de datos (patrón Repository)
+├── risk/                  Reglas de riesgo (Strategy), foto de la obra y evaluador
 ├── security/              Tokens JWT, hash de tokens y respuestas 401/403 en JSON
 ├── service/               Lógica de negocio
 ├── storage/               Dónde se guardan los archivos de los planos (base de datos o carpeta)
