@@ -6,18 +6,30 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
+import com.obraia.backend.entity.blueprint.BlueprintMeasurement;
+import com.obraia.backend.entity.blueprint.MeasurementSource;
+import com.obraia.backend.entity.catalog.ElementType;
+import com.obraia.backend.entity.catalog.Material;
+import com.obraia.backend.entity.catalog.MaterialCategory;
+import com.obraia.backend.entity.catalog.MaterialFormula;
 import com.obraia.backend.entity.catalog.PhaseTemplate;
 import com.obraia.backend.entity.catalog.ProjectType;
 import com.obraia.backend.entity.catalog.SizeCategory;
+import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.exception.ConflictException;
+import com.obraia.backend.quotation.MaterialTakeoff;
+import com.obraia.backend.support.BlueprintFixtures;
 import com.obraia.backend.support.CatalogFixtures;
+import com.obraia.backend.support.ProjectFixtures;
 
-/** The Factory Method: each project type gets its own planner. */
+/** The Factory Method: each project type gets its own planner and material calculator. */
 class ProjectCalculatorFactoryTest {
 
     private static final LocalDate MONDAY = LocalDate.of(2026, 11, 2);
@@ -101,5 +113,20 @@ class ProjectCalculatorFactoryTest {
                 MONDAY.minusDays(1));
 
         assertEquals(MONDAY, phases.get(0).plannedStart());
+    }
+
+    @Test
+    void bothTypesCalculateMaterialsWithTheStandardCalculator() {
+        Project project = ProjectFixtures.project(UUID.randomUUID(), "Casa Materiales");
+        Material block = CatalogFixtures.material("Bloque de arcilla No. 5", MaterialCategory.MASONRY, "1600");
+        List<MaterialFormula> formulas = List.of(CatalogFixtures.formula(house, block, ElementType.WALL, "12.5"));
+        List<BlueprintMeasurement> walls = List.of(BlueprintFixtures.measurement(project, MeasurementSource.MANUAL,
+                ElementType.WALL, 1, "4", null, "2", 1));
+
+        MaterialTakeoff fromHouse = factories.forType(house).calculateMaterials(walls, formulas);
+        MaterialTakeoff fromShop = factories.forType(shop).calculateMaterials(walls, formulas);
+
+        assertEquals(new BigDecimal("100.00"), fromHouse.needs().get(0).quantity());
+        assertEquals(fromHouse, fromShop);
     }
 }
