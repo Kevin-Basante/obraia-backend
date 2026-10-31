@@ -19,21 +19,27 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.obraia.backend.dto.expense.ExpenseRequest;
 import com.obraia.backend.dto.expense.ExpenseResponse;
+import com.obraia.backend.entity.budget.Budget;
+import com.obraia.backend.entity.budget.BudgetStatus;
 import com.obraia.backend.entity.expense.Expense;
 import com.obraia.backend.entity.expense.ExpenseCategory;
 import com.obraia.backend.entity.phase.Phase;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.entity.project.ProjectStatus;
+import com.obraia.backend.event.BudgetChangedEvent;
 import com.obraia.backend.exception.BadRequestException;
 import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.exception.FieldValidationException;
 import com.obraia.backend.exception.ResourceNotFoundException;
+import com.obraia.backend.repository.BudgetRepository;
 import com.obraia.backend.repository.ExpenseRepository;
 import com.obraia.backend.repository.PhaseRepository;
 import com.obraia.backend.repository.UserRepository;
+import com.obraia.backend.support.BudgetFixtures;
 import com.obraia.backend.support.PhaseFixtures;
 import com.obraia.backend.support.ProjectFixtures;
 import com.obraia.backend.support.TestUsers;
@@ -50,6 +56,8 @@ class ExpenseServiceTest {
 
     private ExpenseRepository expenses;
     private PhaseRepository phases;
+    private BudgetRepository budgets;
+    private ApplicationEventPublisher events;
     private ProjectAccessService access;
     private ExpenseService service;
 
@@ -57,13 +65,17 @@ class ExpenseServiceTest {
     void setUp() {
         expenses = mock(ExpenseRepository.class);
         phases = mock(PhaseRepository.class);
+        budgets = mock(BudgetRepository.class);
+        events = mock(ApplicationEventPublisher.class);
         access = mock(ProjectAccessService.class);
         UserRepository users = mock(UserRepository.class);
         when(access.requireProject(project.getId(), userId)).thenReturn(project);
         when(users.getReferenceById(userId)).thenReturn(TestUsers.verifiedUser("hash"));
         when(expenses.save(any())).thenAnswer(call -> call.getArgument(0));
         when(phases.findByIdAndProjectId(phase.getId(), project.getId())).thenReturn(Optional.of(phase));
-        service = new ExpenseService(expenses, phases, users, access, CLOCK);
+        when(budgets.findByProjectIdAndStatus(project.getId(), BudgetStatus.APPROVED)).thenReturn(Optional.empty());
+        when(expenses.sumByProjectId(project.getId())).thenReturn(BigDecimal.ZERO);
+        service = new ExpenseService(expenses, phases, budgets, users, access, events, CLOCK);
     }
 
     private static ExpenseRequest request(String category, String amount, LocalDate date) {
@@ -150,6 +162,28 @@ class ExpenseServiceTest {
                 () -> service.delete(project.getId(), userId, expenseId));
 
         assertEquals("EXPENSE_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    void theApprovedBudgetKeepsTheTotalSpent() {
+        Budget approved = BudgetFixtures.approved(project, 2, "5000000");
+        when(budgets.findByProjectIdAndStatus(project.getId(), BudgetStatus.APPROVED))
+                .thenReturn(Optional.of(approved));
+        when(expenses.sumByProjectId(project.getId())).thenReturn(new BigDecimal("1650000.00"));
+
+        service.create(project.getId(), userId, request("materials", "650000", null));
+
+        assertEquals(new BigDecimal("1650000.00"), approved.getActualAmount());
+        verify(budgets).save(approved);
+        verify(events).publishEvent(new BudgetChangedEvent(project.getId()));
+    }
+
+    @Test
+    void withoutApprovedBudgetNothingIsUpdated() {
+        service.create(project.getId(), userId, request("materials", "650000", null));
+
+        verify(budgets, never()).save(any());
+        verify(events, never()).publishEvent(any(Object.class));
     }
 
     @Test
