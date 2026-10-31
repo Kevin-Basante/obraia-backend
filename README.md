@@ -237,7 +237,7 @@ Con `MAIL_PROVIDER=log` los correos no se envían: el enlace aparece en la conso
 ## Cómo funcionan los planos y las medidas
 
 - Cada obra puede tener hasta 10 planos de máximo 10 MB: PDF o imagen (PNG, JPG o WEBP). El backend reconoce el tipo por los primeros bytes del archivo, no por el nombre, así que un archivo renombrado a `.pdf` se rechaza.
-- Un PDF con texto (hecho en un programa de dibujo) queda como `vector_pdf`; uno sin texto, como `scanned_pdf`. Las fotos quedan como `image`. Todos empiezan en estado `pending` hasta que la IA los procese (bloque 7).
+- Un PDF con texto (hecho en un programa de dibujo) queda como `vector_pdf`; uno sin texto, como `scanned_pdf`. Las fotos quedan como `image`. Todos empiezan en estado `pending`; al analizarlos con la IA quedan `completed` o, si la IA falla, `failed` (se pueden analizar de nuevo).
 - **Patrón Bridge:** los servicios guardan los archivos a través de la interfaz `BlueprintStorage`, sin saber dónde quedan. Hay dos implementaciones:
   - `DatabaseBlueprintStorage` (`STORAGE_PROVIDER=database`): guarda los bytes en la tabla `blueprint_files` (migración V4). Es la que se usa en Render, porque su plan gratuito borra el disco en cada despliegue.
   - `LocalBlueprintStorage` (`STORAGE_PROVIDER=local`): guarda los archivos en la carpeta `uploads/`, que no se sube a Git.
@@ -253,6 +253,23 @@ Con `MAIL_PROVIDER=log` los correos no se envían: el enlace aparece en la conso
 - Las medidas leídas por la IA (fuente `ocr`) no se pueden editar ni borrar. La comparación suma cada elemento por piso y marca `match` si la diferencia es de 10 % o menos y `review` si es mayor. Mientras la IA no mida, cada fila sale como `manual_only`.
 - Una obra terminada o cancelada no acepta planos ni medidas nuevas, pero se pueden seguir consultando.
 - Al borrar una obra para siempre (tarea de las 4:00 a. m.) también se borran los archivos de sus planos.
+
+## Cómo funciona la lectura de planos con IA
+
+La IA vive en otro servicio, `obraia-ia` (Python con FastAPI y Gemini), porque el curso pide que esté separada. El backend lo llama así:
+
+```text
+BlueprintAnalysisService / QuotationFacade  →  AiServiceProxy  →  AiServiceAdapter  →  obraia-ia  →  Gemini
+```
+
+- **Patrón Adapter:** `AiServiceAdapter` es el único que sabe cómo se llama a `obraia-ia`: arma el formulario `multipart/form-data` con el plano y los pisos, envía la clave en `X-Service-Token`, lee la respuesta en `snake_case` y la traduce a clases del backend (`ElementType`, `BigDecimal` con dos decimales). Los elementos que el backend no conoce se cuentan como descartados. Si el servicio falla, no responde a tiempo o su respuesta no se puede leer, lanza 502 `AI_SERVICE_FAILED`.
+- **Patrón Proxy:** `AiServiceProxy` tiene la misma interfaz (`AiServiceClient`) y se pone delante del adaptador, así que quien lo usa no nota la diferencia. Hace tres cosas:
+  - **Protección:** si `AI_SERVICE_URL` está vacía responde 503 `AI_SERVICE_DISABLED`, y cada obra puede llamar a la IA máximo 5 veces por hora (`app.ai.max-analyses-per-project`), porque el plan gratuito del modelo tiene cuota. Al pasarse responde 429 `AI_LIMIT_REACHED`.
+  - **Caché:** guarda en memoria los últimos 50 análisis por el contenido del archivo (SHA-256) y los pisos. El mismo plano no se envía dos veces: la respuesta sale de la caché (`cached: true`) y no cuenta para el límite.
+  - **Carga perezosa:** el adaptador es un bean `@Lazy`; se crea la primera vez que hay que leer un plano, no al arrancar.
+- **Análisis** (`POST .../blueprints/{planoId}/analyze`): guarda lo que leyó la IA como medidas con fuente `ocr` ligadas al plano y deja el plano en `completed`. Analizar otra vez reemplaza las medidas que la IA había leído de ese plano. Las medidas en un piso que la obra no tiene se descartan.
+- **Diferencia con lo manual:** cada medida de la IA guarda en `discrepancy_pct` cuánto se aleja el total de la IA del total manual para ese elemento y piso (vacío si no hay medidas manuales).
+- La primera llamada después de un rato puede tardar cerca de un minuto, porque Render apaga `obraia-ia` cuando no se usa (el tiempo de espera es de 150 segundos).
 
 ## Cómo funcionan las fases y las tareas
 
