@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.ResourceAccessException;
@@ -14,6 +15,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import com.obraia.backend.config.AiProperties;
 import com.obraia.backend.entity.catalog.ElementType;
 import com.obraia.backend.exception.BadRequestException;
 
@@ -33,6 +35,18 @@ public class AiServiceAdapter implements AiServiceClient {
 
     public AiServiceAdapter(RestClient restClient) {
         this.restClient = restClient;
+    }
+
+    /** Adapter with the URL, token and timeouts of the settings. */
+    public static AiServiceAdapter create(AiProperties properties) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(properties.connectTimeout());
+        requestFactory.setReadTimeout(properties.readTimeout());
+        return new AiServiceAdapter(RestClient.builder()
+                .baseUrl(properties.baseUrl())
+                .defaultHeader(TOKEN_HEADER, properties.serviceToken())
+                .requestFactory(requestFactory)
+                .build());
     }
 
     @Override
