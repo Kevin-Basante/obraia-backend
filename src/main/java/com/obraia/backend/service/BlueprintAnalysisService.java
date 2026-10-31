@@ -1,6 +1,9 @@
 package com.obraia.backend.service;
 
+import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -11,6 +14,7 @@ import com.obraia.backend.ai.AiServiceException;
 import com.obraia.backend.ai.AnalysisRequest;
 import com.obraia.backend.ai.BlueprintAnalysis;
 import com.obraia.backend.dto.blueprint.BlueprintAnalysisResponse;
+import com.obraia.backend.dto.blueprint.ComparisonRowResponse;
 import com.obraia.backend.dto.blueprint.MeasurementResponse;
 import com.obraia.backend.entity.blueprint.Blueprint;
 import com.obraia.backend.entity.blueprint.BlueprintMeasurement;
@@ -73,9 +77,25 @@ public class BlueprintAnalysisService {
         measurementRepository.saveAllAndFlush(saved);
         // Reads created_at, which the database fills in.
         saved.forEach(entityManager::refresh);
+        updateDiscrepancies(projectId, saved);
         blueprint.markCompleted();
         int discarded = analysis.discarded() + analysis.measurements().size() - saved.size();
         return BlueprintAnalysisResponse.from(blueprint, analysis, discarded,
                 saved.stream().map(MeasurementResponse::from).toList());
+    }
+
+    /** Each new measurement keeps how far the AI total of its element and floor is from the manual one. */
+    private void updateDiscrepancies(UUID projectId, List<BlueprintMeasurement> saved) {
+        Map<String, BigDecimal> differences = new HashMap<>();
+        for (ComparisonRowResponse row : MeasurementComparator
+                .compare(measurementRepository.findByProjectIdOrderByCreatedAtAsc(projectId)).rows()) {
+            if (row.differencePct() != null) {
+                differences.put(row.elementType() + ":" + row.floorNumber(), row.differencePct());
+            }
+        }
+        for (BlueprintMeasurement measurement : saved) {
+            measurement.updateDiscrepancy(differences.get(
+                    measurement.getElementType().getCode() + ":" + measurement.getFloorNumber()));
+        }
     }
 }
