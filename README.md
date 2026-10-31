@@ -287,6 +287,18 @@ Con `MAIL_PROVIDER=log` los correos no se envían: el enlace aparece en la conso
 - La migración V5 agrega el % de transporte a cada ciudad y los tipos de fila `waste` y `transport`.
 - Errores: sin medidas manuales responde 409 `NO_MEASUREMENTS`; si ningún elemento medido tiene fórmulas, 409 `NO_MATERIAL_FORMULAS`; aprobar algo que no es borrador, 409 `BUDGET_NOT_DRAFT`.
 
+## Caché
+
+El backend usa la caché de Spring (`@EnableCaching` en `CacheConfig`) guardada en memoria (`ConcurrentMapCacheManager`).
+
+| Caché              | Qué guarda                                   | Cuándo se borra                                               |
+| ------------------ | -------------------------------------------- | ------------------------------------------------------------- |
+| `projectTypes`, `locations`, `materials`, `phaseTemplates`, `materialFormulas` | Catálogos (`@Cacheable` en los repositorios) | Nunca: solo cambian con migraciones, que reinician el servidor |
+| `budgetVersions`   | Versiones del presupuesto de cada obra (`BudgetVersions.list`) | `@CacheEvict` cada vez que se cotiza o se aprueba |
+
+Para borrar `budgetVersions` en el momento correcto se usa el **patrón Observer** con los eventos de Spring: `BudgetService` publica `BudgetChangedEvent` y `BudgetVersions.onBudgetChanged` lo escucha con `@TransactionalEventListener`, que espera a que el cambio quede guardado en la base de datos antes de borrar la caché.
+Además, los catálogos responden con `Cache-Control: max-age=600` para que el navegador también los guarde.
+
 ## Estructura
 
 Arquitectura por capas: controladores → servicios → repositorios → base de datos.
