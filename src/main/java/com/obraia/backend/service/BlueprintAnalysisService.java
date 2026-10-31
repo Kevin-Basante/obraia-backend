@@ -56,13 +56,15 @@ public class BlueprintAnalysisService {
         measurementRepository.deleteAll(
                 measurementRepository.findByBlueprintIdAndSource(blueprintId, MeasurementSource.OCR));
         List<BlueprintMeasurement> saved = analysis.measurements().stream()
+                .filter(measurement -> measurement.floorNumber() <= project.getFloors())
                 .map(measurement -> measurement.toEntity(project, blueprint))
                 .toList();
         measurementRepository.saveAllAndFlush(saved);
         // Reads created_at, which the database fills in.
         saved.forEach(entityManager::refresh);
         blueprint.markCompleted();
-        return BlueprintAnalysisResponse.from(blueprint, analysis, analysis.discarded(),
+        int discarded = analysis.discarded() + analysis.measurements().size() - saved.size();
+        return BlueprintAnalysisResponse.from(blueprint, analysis, discarded,
                 saved.stream().map(MeasurementResponse::from).toList());
     }
 }
