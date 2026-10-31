@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.obraia.backend.dto.budget.BudgetResponse;
 import com.obraia.backend.dto.budget.BudgetSummaryResponse;
+import com.obraia.backend.dto.budget.ProjectMaterialResponse;
 import com.obraia.backend.dto.budget.QuotationResponse;
 import com.obraia.backend.entity.budget.Budget;
 import com.obraia.backend.entity.budget.BudgetItem;
@@ -115,6 +116,14 @@ public class BudgetService {
         budgetRepository.saveAndFlush(budget);
         events.publishEvent(new BudgetChangedEvent(projectId));
         return BudgetResponse.from(budget, itemRepository.findByBudgetIdOrderBySequenceOrderAsc(budgetId));
+    }
+
+    /** The materials of the last quotation, by name. */
+    @Transactional(readOnly = true)
+    public List<ProjectMaterialResponse> materials(UUID projectId, UUID userId) {
+        accessService.requireMembership(projectId, userId);
+        return materialRepository.findByProjectIdOrderByMaterialNameAsc(projectId).stream()
+                .map(ProjectMaterialResponse::from).toList();
     }
 
     private void replaceMaterials(Project project, List<MaterialNeed> needs) {
