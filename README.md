@@ -256,7 +256,8 @@ Con `MAIL_PROVIDER=log` los correos no se envían: el enlace aparece en la conso
 - **Patrón Factory Method:** cada tipo de obra tiene su fábrica, que hereda de `ProjectCalculatorFactory` y decide qué planificador de fases crear (`createPhasePlanner()`):
   - `HouseCalculatorFactory` (Vivienda unifamiliar) crea `HousePhasePlanner`.
   - `CommercialUnitCalculatorFactory` (Local comercial) crea `CommercialUnitPhasePlanner`, que agrega al final la fase "Adecuación comercial (fachada, vitrina y cortina metálica)" (7 días hábiles en obra pequeña, 10 en grande).
-  - Los servicios solo llaman a `planPhases(...)`, así que un tipo de obra nuevo es una clase nueva, sin cambiar los servicios. En el bloque 6 la misma fábrica creará el calculador de materiales.
+  - La misma fábrica crea el calculador de materiales (`createMaterialCalculator()`), que usa la cotización. Los dos tipos usan hoy `StandardMaterialCalculator`.
+  - Los servicios solo llaman a `planPhases(...)` y `calculateMaterials(...)`, así que un tipo de obra nuevo es una clase nueva, sin cambiar los servicios.
 - El plan parte de las fases estándar del catálogo según el tamaño de la obra (pequeña hasta 120 m², grande desde ahí). Cada fase trae sus tareas iniciales, que se pueden editar, borrar o completar con tareas nuevas.
 - Las fechas se calculan en días hábiles de lunes a sábado desde la fecha de inicio planeada de la obra; si la obra no tiene fecha, las fases quedan sin fechas. Cada fase empieza el día hábil siguiente al fin de la anterior.
 - Estados de fases y tareas: `planned` → `in_progress` → `delayed` o `completed`. Una tarea o fase completada se puede reabrir (`in_progress`). Una fase o tarea está atrasada (`late`) si pasó su fecha de fin planeada y no está completada.
@@ -264,6 +265,27 @@ Con `MAIL_PROVIDER=log` los correos no se envían: el enlace aparece en la conso
 - El avance de una tarea es su último reporte (por fecha del reporte). El avance de una fase es el promedio de sus tareas y el de la obra es el promedio de todas las tareas.
 - El reporte puede indicar que lo dio el maestro de obra asignado (`fromSiteManager: true`); si la obra no tiene maestro asignado, la respuesta es 400. La fecha del reporte no puede ser futura y, si no se envía, es hoy (hora de Colombia).
 - El plan solo se puede crear una vez (409 `PHASES_ALREADY_CREATED`) y solo se puede borrar mientras no tenga reportes (409 `PHASES_HAVE_PROGRESS`).
+
+## Cómo funciona la cotización
+
+- **Patrón Facade:** `QuotationFacade.quoteProject(obra)` es la única llamada que hace el servicio de presupuestos. Por dentro lee las medidas manuales, pide las cantidades a la fábrica del tipo de obra, toma el % de transporte de la ciudad y los días hábiles del plan, y arma las capas de costo. En el bloque 7 se sumarán las medidas de la IA a través del proxy del servicio de IA.
+- **Cantidades:** para cada elemento medido se suma su cantidad (m³ o m²) y se multiplica por el consumo de cada fórmula de ese elemento (por ejemplo 12,5 bloques por m² de muro). El desperdicio de cada fórmula (5 % o 10 %) se calcula aparte.
+- **Patrón Decorator:** el costo es un `CostComponent`. `MaterialsCost` es el componente base y cada decorador lo envuelve y agrega una capa:
+
+  | Orden | Capa                       | Cómo se calcula                                                        |
+  | ----- | -------------------------- | ---------------------------------------------------------------------- |
+  | 1     | `MaterialsCost` (materiales) | Cantidad exacta × precio de referencia (el precio ya incluye IVA)      |
+  | 2     | `WasteCost` (desperdicio)  | Material extra por roturas y cortes, según el desperdicio de cada fórmula |
+  | 3     | `TransportCost` (transporte) | % de la ciudad sobre materiales y desperdicio (3 % en Bogotá, 6 % en Pasto) |
+  | 4     | `LaborCost` (mano de obra) | Días hábiles × costo diario de la cuadrilla (`app.quotation.labor-daily-rate`, $280.000) |
+  | 5     | `TaxCost` (IVA)            | 19 % sobre mano de obra y transporte (`app.quotation.vat-pct`)          |
+
+  Cada capa es una fila del presupuesto (`budget_items`). Agregar una capa nueva (por ejemplo imprevistos) es un decorador nuevo, sin tocar los demás.
+- **Días hábiles:** si la obra ya tiene fases con fechas, se cuentan los días hábiles entre la primera y la última; si no, se suman las duraciones de las fases estándar del tipo de obra (`workingDaysSource` dice cuál se usó).
+- **Patrón Builder:** el resultado (`Quotation`) se arma paso a paso con `Quotation.builder()`, porque tiene muchas partes; `build()` revisa que estén las obligatorias.
+- Cada cotización guardada es una versión nueva en borrador (`draft`) y reemplaza la lista de materiales de la obra (`project_materials`) con el precio de ese momento. Al aprobar una versión, la aprobada antes pasa a `superseded`; la base de datos solo permite un presupuesto aprobado por obra.
+- La migración V5 agrega el % de transporte a cada ciudad y los tipos de fila `waste` y `transport`.
+- Errores: sin medidas manuales responde 409 `NO_MEASUREMENTS`; si ningún elemento medido tiene fórmulas, 409 `NO_MATERIAL_FORMULAS`; aprobar algo que no es borrador, 409 `BUDGET_NOT_DRAFT`.
 
 ## Estructura
 
