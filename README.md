@@ -333,6 +333,45 @@ BlueprintAnalysisService / QuotationFacade  →  AiServiceProxy  →  AiServiceA
 - La migración V5 agrega el % de transporte a cada ciudad y los tipos de fila `waste` y `transport`.
 - Errores: sin medidas (ni manuales, ni de la IA, ni planos que leer) responde 409 `NO_MEASUREMENTS`; si ningún elemento medido tiene fórmulas, 409 `NO_MATERIAL_FORMULAS`; aprobar algo que no es borrador, 409 `BUDGET_NOT_DRAFT`.
 
+## Cómo funcionan los gastos
+
+- Un gasto es dinero que ya se pagó en la obra. Tiene categoría (`materials`, `labor`, `equipment`, `tax` u `other`), descripción, valor, fecha y, si se quiere, la fase a la que pertenece.
+- La fecha no puede ser futura y, si no se envía, es hoy (hora de Colombia). La fase tiene que ser de la misma obra. En una obra completada o cancelada no se pueden registrar ni borrar gastos (409 `PROJECT_CLOSED`).
+- Cada vez que se registra o se borra un gasto, el total gastado se copia en el `actual_amount` del presupuesto aprobado. Al aprobar una versión nueva, esta empieza con lo que ya se había gastado.
+- El resumen (`/expenses/summary`) muestra el total gastado, el presupuesto aprobado, lo que queda (negativo si ya se pasó), el % gastado y el total de cada categoría, de la más grande a la más pequeña.
+- No hace falta una migración nueva: las tablas `expenses`, `risk_assessments` y `notifications` ya estaban en la V2.
+
+## Cómo funciona el riesgo
+
+- **Patrón Strategy:** cada regla de riesgo es una clase que implementa `RiskStrategy` y le pone a la obra un puntaje de 0 a 100. `RiskEvaluator` recibe todas las estrategias que Spring encuentra y las combina, sin saber qué hace cada una. Una regla nueva es una clase nueva, sin cambiar el evaluador.
+
+  | Estrategia              | Código           | Peso | Qué mira                                                          |
+  | ----------------------- | ---------------- | ---- | ----------------------------------------------------------------- |
+  | `ScheduleDelayStrategy` | `schedule_delay` | 35 % | Tareas (o fases sin tareas) que pasaron su fecha de fin sin completarse |
+  | `ProgressPaceStrategy`  | `progress_pace`  | 25 % | % del tiempo planeado que ya pasó contra % de la obra hecho       |
+  | `BudgetOverrunStrategy` | `budget_overrun` | 25 % | % del presupuesto aprobado que ya se gastó (sube desde el 90 %)   |
+  | `SpendingPaceStrategy`  | `spending_pace`  | 15 % | % gastado contra % de la obra hecho                               |
+
+- **Puntaje final:** la mitad es el promedio ponderado de las cuatro reglas y la otra mitad es la regla más alta, para que un solo problema grave no quede escondido. El nivel sale del puntaje: `low` (menos de 25), `medium` (25 a 49,99), `high` (50 a 74,99) y `critical` (75 o más).
+- **Días de atraso esperados:** el mayor entre los días de atraso de la tarea más atrasada y los días que faltan para alcanzar el ritmo planeado.
+- Cada regla devuelve su puntaje, su peso, sus días de atraso y una frase que explica el resultado (`detail`), por ejemplo `105% of the approved budget is spent`. Se guardan como JSON en la columna `risk_factors`.
+- El riesgo se evalúa solo después de cada gasto (`expense`) y de cada reporte de avance (`progress_report`), y también cuando un miembro lo pide (`manual`). Las obras completadas o canceladas no se evalúan solas. Cada evaluación se guarda, así que la respuesta trae la última y la historia (las últimas 20, de la más vieja a la más nueva) para dibujar la gráfica.
+- La versión del modelo es `rules-v1` (reglas fijas, sin IA).
+
+## Cómo funcionan las notificaciones
+
+- **Patrón Observer:** los servicios publican eventos de Spring y no saben quién los escucha. `ProjectNotifications` los escucha con `@TransactionalEventListener`, después de que el cambio queda guardado, y avisa a todos los miembros de la obra:
+
+  | Evento                | Lo publica                     | Notificación                                                   |
+  | --------------------- | ------------------------------ | -------------------------------------------------------------- |
+  | `BudgetApprovedEvent` | `BudgetService` al aprobar     | `budget_approved`: versión aprobada y su valor                 |
+  | `BudgetExceededEvent` | `ExpenseService`               | `budget_deviation`: solo la primera vez que los gastos pasan el presupuesto aprobado |
+  | `RiskAssessedEvent`   | `RiskAssessmentService`        | `delay_risk`: solo cuando el riesgo llega a `high` o `critical` y subió de nivel |
+
+- Con el mismo patrón, `RiskTriggers` escucha `ExpensesChangedEvent` y `ProgressReportedEvent` para evaluar el riesgo otra vez.
+- Los dos observadores trabajan en su propia transacción: si fallan, el error queda en el log y el gasto, el reporte o la aprobación no se pierden.
+- Cada usuario solo ve y marca sus propias notificaciones; la de otro usuario responde 404 `NOTIFICATION_NOT_FOUND`.
+
 ## Caché
 
 El backend usa la caché de Spring (`@EnableCaching` en `CacheConfig`) guardada en memoria (`ConcurrentMapCacheManager`).
