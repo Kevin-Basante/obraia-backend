@@ -13,7 +13,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,6 +34,7 @@ class AiServiceProxyTest {
             false);
 
     private final UUID projectId = UUID.randomUUID();
+    private final MutableClock clock = new MutableClock(Instant.parse("2026-10-31T15:00:00Z"));
 
     private AiServiceAdapter adapter;
     private ObjectProvider<AiServiceAdapter> provider;
@@ -117,7 +122,7 @@ class AiServiceProxyTest {
     private AiServiceProxy proxy(String baseUrl, int maxAnalyses, int cacheSize) {
         AiProperties properties = new AiProperties(baseUrl, "secret", Duration.ofSeconds(1), Duration.ofSeconds(1),
                 maxAnalyses, Duration.ofHours(1), cacheSize);
-        return new AiServiceProxy(properties, provider);
+        return new AiServiceProxy(properties, provider, clock);
     }
 
     private AnalysisRequest request(String content, int floors) {
@@ -126,5 +131,34 @@ class AiServiceProxyTest {
 
     private static byte[] bytes(String content) {
         return content.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** A clock the test can move forward. */
+    private static final class MutableClock extends Clock {
+
+        private Instant now;
+
+        MutableClock(Instant now) {
+            this.now = now;
+        }
+
+        void advance(Duration duration) {
+            now = now.plus(duration);
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
     }
 }
