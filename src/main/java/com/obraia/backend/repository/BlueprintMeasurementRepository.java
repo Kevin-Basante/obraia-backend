@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.obraia.backend.entity.blueprint.BlueprintMeasurement;
+import com.obraia.backend.entity.blueprint.MeasurementSource;
 
 public interface BlueprintMeasurementRepository extends JpaRepository<BlueprintMeasurement, UUID> {
 
@@ -17,4 +18,7 @@ public interface BlueprintMeasurementRepository extends JpaRepository<BlueprintM
 
     @EntityGraph(attributePaths = "blueprint")
     Optional<BlueprintMeasurement> findByIdAndProjectId(UUID id, UUID projectId);
+
+    /** The measurements one source took from a blueprint, for example the ones the AI read before. */
+    List<BlueprintMeasurement> findByBlueprintIdAndSource(UUID blueprintId, MeasurementSource source);
 }
