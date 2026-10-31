@@ -22,6 +22,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.util.unit.DataSize;
 
 import com.obraia.backend.ai.AiMeasurement;
+import com.obraia.backend.ai.AiServiceBusyException;
 import com.obraia.backend.ai.AiServiceClient;
 import com.obraia.backend.ai.AiServiceException;
 import com.obraia.backend.ai.AnalysisRequest;
@@ -182,6 +183,16 @@ class BlueprintAnalysisServiceTest {
         when(aiService.analyze(any())).thenThrow(new AiServiceException("The AI service answered 502", null));
 
         assertThrows(AiServiceException.class, () -> service.analyze(project.getId(), userId, blueprint.getId()));
+
+        assertEquals(ProcessingStatus.FAILED, blueprint.getProcessingStatus());
+        verify(measurements, never()).saveAllAndFlush(any());
+    }
+
+    @Test
+    void whenTheAiIsBusyTheBlueprintIsMarkedAsFailedToo() {
+        when(aiService.analyze(any())).thenThrow(new AiServiceBusyException(null));
+
+        assertThrows(AiServiceBusyException.class, () -> service.analyze(project.getId(), userId, blueprint.getId()));
 
         assertEquals(ProcessingStatus.FAILED, blueprint.getProcessingStatus());
         verify(measurements, never()).saveAllAndFlush(any());
