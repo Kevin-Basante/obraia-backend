@@ -91,7 +91,7 @@ Al arrancar, Flyway crea las tablas y carga los datos iniciales si todavía no e
 | GET    | `/api/catalogs/project-types/{id}`                  | Un tipo de obra                                                     |
 | GET    | `/api/catalogs/project-types/{id}/phases`           | Fases estándar y duración total (`?size=small` o `?area=95`)        |
 | GET    | `/api/catalogs/project-types/{id}/material-formulas` | Consumo de materiales por elemento (`?element=wall`)               |
-| GET    | `/api/catalogs/locations`                           | Ciudades (`?department=Antioquia`, `?search=bogota`)                |
+| GET    | `/api/catalogs/locations`                           | Ciudades con su % de transporte (`?department=Antioquia`, `?search=bogota`) |
 | GET    | `/api/catalogs/locations/departments`               | Departamentos con ciudades                                          |
 | GET    | `/api/catalogs/material-categories`                 | Categorías de materiales                                            |
 | GET    | `/api/catalogs/materials`                           | Materiales con precio de referencia (`?category=steel`, `?search=arena`) |
@@ -157,6 +157,17 @@ Al arrancar, Flyway crea las tablas y carga los datos iniciales si todavía no e
 | PATCH  | `/api/projects/{id}/tasks/{tareaId}/status`        | Cambiar el estado de una tarea                                |
 | GET    | `/api/projects/{id}/tasks/{tareaId}/progress`      | Reportes de avance de la tarea, del más nuevo al más viejo    |
 | POST   | `/api/projects/{id}/tasks/{tareaId}/progress`      | Reportar el avance de la tarea (0 a 100 %)                    |
+
+### Presupuestos (requieren token)
+
+| Método | Ruta                                               | Qué hace                                                      |
+| ------ | -------------------------------------------------- | ------------------------------------------------------------- |
+| GET    | `/api/projects/{id}/budgets`                       | Versiones del presupuesto, de la más nueva a la más vieja     |
+| GET    | `/api/projects/{id}/budgets/preview`               | Cotizar la obra sin guardar                                   |
+| POST   | `/api/projects/{id}/budgets`                       | Cotizar la obra y guardarla como una versión nueva (borrador) |
+| GET    | `/api/projects/{id}/budgets/{presupuestoId}`       | Una versión con sus filas (una por capa de costo)             |
+| POST   | `/api/projects/{id}/budgets/{presupuestoId}/approve` | Aprobar un borrador; el aprobado anterior queda reemplazado |
+| GET    | `/api/projects/{id}/materials`                     | Materiales de la última cotización, con desperdicio           |
 
 ### Maestros de obra (requieren token)
 
