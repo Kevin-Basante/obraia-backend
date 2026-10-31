@@ -50,4 +50,12 @@ class WorkCalendarTest {
         assertEquals(LocalDate.of(2026, 11, 9), WorkCalendar.nextWorkingDay(SATURDAY));
         assertEquals(LocalDate.of(2026, 11, 3), WorkCalendar.nextWorkingDay(MONDAY));
     }
+
+    @Test
+    void workingDaysBetweenCountBothEndsAndSkipSundays() {
+        assertEquals(6, WorkCalendar.workingDaysBetween(MONDAY, SATURDAY.plusDays(1)));
+        assertEquals(12, WorkCalendar.workingDaysBetween(MONDAY, LocalDate.of(2026, 11, 14)));
+        assertEquals(1, WorkCalendar.workingDaysBetween(MONDAY, MONDAY));
+        assertEquals(0, WorkCalendar.workingDaysBetween(SATURDAY, MONDAY));
+    }
 }
