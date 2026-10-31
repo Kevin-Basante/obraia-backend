@@ -22,6 +22,7 @@ import com.obraia.backend.entity.expense.ExpenseCategory;
 import com.obraia.backend.entity.phase.Phase;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.event.BudgetChangedEvent;
+import com.obraia.backend.event.ExpensesChangedEvent;
 import com.obraia.backend.exception.FieldValidationException;
 import com.obraia.backend.exception.ResourceNotFoundException;
 import com.obraia.backend.repository.BudgetRepository;
@@ -108,6 +109,7 @@ public class ExpenseService {
                 userRepository.getReferenceById(userId), category, request.description().strip(), request.amount(),
                 expenseDate, clock.instant()));
         updateApprovedBudget(projectId);
+        events.publishEvent(new ExpensesChangedEvent(projectId));
         return ExpenseResponse.from(expense);
     }
 
@@ -121,6 +123,7 @@ public class ExpenseService {
                         "The expense " + expenseId + " does not exist in this project"));
         expenseRepository.delete(expense);
         updateApprovedBudget(projectId);
+        events.publishEvent(new ExpensesChangedEvent(projectId));
     }
 
     /** Copies the total spent to the approved budget, if there is one. */

@@ -32,6 +32,7 @@ import com.obraia.backend.entity.phase.Phase;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.entity.project.ProjectStatus;
 import com.obraia.backend.event.BudgetChangedEvent;
+import com.obraia.backend.event.ExpensesChangedEvent;
 import com.obraia.backend.exception.BadRequestException;
 import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.exception.FieldValidationException;
@@ -153,6 +154,7 @@ class ExpenseServiceTest {
         service.delete(project.getId(), userId, expenseId);
 
         verify(expenses).delete(expense);
+        verify(events).publishEvent(new ExpensesChangedEvent(project.getId()));
     }
 
     @Test
@@ -185,7 +187,14 @@ class ExpenseServiceTest {
         service.create(project.getId(), userId, request("materials", "650000", null));
 
         verify(budgets, never()).save(any());
-        verify(events, never()).publishEvent(any(Object.class));
+        verify(events, never()).publishEvent(new BudgetChangedEvent(project.getId()));
+    }
+
+    @Test
+    void registeringAnExpenseIsAnnounced() {
+        service.create(project.getId(), userId, request("materials", "650000", null));
+
+        verify(events).publishEvent(new ExpensesChangedEvent(project.getId()));
     }
 
     @Test
