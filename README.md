@@ -316,6 +316,7 @@ El backend usa la caché de Spring (`@EnableCaching` en `CacheConfig`) guardada 
 | ------------------ | -------------------------------------------- | ------------------------------------------------------------- |
 | `projectTypes`, `locations`, `materials`, `phaseTemplates`, `materialFormulas` | Catálogos (`@Cacheable` en los repositorios) | Nunca: solo cambian con migraciones, que reinician el servidor |
 | `budgetVersions`   | Versiones del presupuesto de cada obra (`BudgetVersions.list`) | `@CacheEvict` cada vez que se cotiza o se aprueba |
+| Análisis de la IA  | Últimos 50 planos leídos, por su contenido (caché propia de `AiServiceProxy`) | Sale el más viejo cuando se llena, o al reiniciar el servidor |
 
 Para borrar `budgetVersions` en el momento correcto se usa el **patrón Observer** con los eventos de Spring: `BudgetService` publica `BudgetChangedEvent` y `BudgetVersions.onBudgetChanged` lo escucha con `@TransactionalEventListener`, que espera a que el cambio quede guardado en la base de datos antes de borrar la caché.
 Además, los catálogos responden con `Cache-Control: max-age=600` para que el navegador también los guarde.
@@ -327,8 +328,8 @@ Además, los catálogos responden con `Cache-Control: max-age=600` para que el n
 | Facade          | `QuotationFacade`: una sola llamada para cotizar una obra            |
 | Decorator       | `CostComponent`, `MaterialsCost` y los decoradores `WasteCost`, `TransportCost`, `LaborCost`, `TaxCost` |
 | Factory Method  | `ProjectCalculatorFactory` y una fábrica por tipo de obra (planificador de fases y calculador de materiales) |
-| Adapter         | Bloque 7: `AiServiceAdapter` para el servicio de IA en Python        |
-| Proxy           | Bloque 7: `AiServiceProxy` (caché, límite de análisis y carga perezosa) |
+| Adapter         | `AiServiceAdapter`: traduce las llamadas y respuestas del servicio de IA en Python |
+| Proxy           | `AiServiceProxy`: protección (servicio apagado y límite por obra), caché y carga perezosa del adaptador |
 | Builder         | `Quotation.builder()`                                                |
 | Bridge          | `BlueprintStorage` con almacenamiento en base de datos o en carpeta  |
 | Template Method | `StandardPhasePlanner`: el algoritmo del plan es fijo y cada tipo de obra pone sus tareas y fases extra |
