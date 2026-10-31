@@ -32,6 +32,7 @@ import com.obraia.backend.entity.phase.Phase;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.entity.project.ProjectStatus;
 import com.obraia.backend.event.BudgetChangedEvent;
+import com.obraia.backend.event.BudgetExceededEvent;
 import com.obraia.backend.event.ExpensesChangedEvent;
 import com.obraia.backend.exception.BadRequestException;
 import com.obraia.backend.exception.ConflictException;
@@ -180,6 +181,33 @@ class ExpenseServiceTest {
         assertEquals(new BigDecimal("1650000.00"), approved.getActualAmount());
         verify(budgets).save(approved);
         verify(events).publishEvent(new BudgetChangedEvent(project.getId()));
+    }
+
+    @Test
+    void passingTheApprovedBudgetIsAnnounced() {
+        Budget approved = BudgetFixtures.approved(project, 1, "5000000");
+        approved.recordActual(new BigDecimal("4800000"));
+        when(budgets.findByProjectIdAndStatus(project.getId(), BudgetStatus.APPROVED))
+                .thenReturn(Optional.of(approved));
+        when(expenses.sumByProjectId(project.getId())).thenReturn(new BigDecimal("5200000"));
+
+        service.create(project.getId(), userId, request("materials", "400000", null));
+
+        verify(events).publishEvent(new BudgetExceededEvent(project.getId(), new BigDecimal("5000000"),
+                new BigDecimal("5200000")));
+    }
+
+    @Test
+    void aBudgetAlreadyPassedIsNotAnnouncedAgain() {
+        Budget approved = BudgetFixtures.approved(project, 1, "5000000");
+        approved.recordActual(new BigDecimal("5200000"));
+        when(budgets.findByProjectIdAndStatus(project.getId(), BudgetStatus.APPROVED))
+                .thenReturn(Optional.of(approved));
+        when(expenses.sumByProjectId(project.getId())).thenReturn(new BigDecimal("5300000"));
+
+        service.create(project.getId(), userId, request("materials", "100000", null));
+
+        verify(events, never()).publishEvent(any(BudgetExceededEvent.class));
     }
 
     @Test
