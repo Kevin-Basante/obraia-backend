@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,6 +20,8 @@ import com.obraia.backend.entity.catalog.ElementType;
 import com.obraia.backend.entity.catalog.Material;
 import com.obraia.backend.entity.catalog.MaterialCategory;
 import com.obraia.backend.entity.catalog.SizeCategory;
+import com.obraia.backend.entity.phase.Phase;
+import com.obraia.backend.entity.phase.WorkSchedule;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.planning.CommercialUnitCalculatorFactory;
@@ -26,6 +29,7 @@ import com.obraia.backend.planning.HouseCalculatorFactory;
 import com.obraia.backend.planning.ProjectCalculatorFactories;
 import com.obraia.backend.repository.BlueprintMeasurementRepository;
 import com.obraia.backend.repository.MaterialFormulaRepository;
+import com.obraia.backend.repository.PhaseRepository;
 import com.obraia.backend.repository.PhaseTemplateRepository;
 import com.obraia.backend.support.BlueprintFixtures;
 import com.obraia.backend.support.CatalogFixtures;
@@ -39,11 +43,13 @@ class QuotationFacadeTest {
             "1600");
 
     private BlueprintMeasurementRepository measurements;
+    private PhaseRepository phases;
     private QuotationFacade facade;
 
     @BeforeEach
     void setUp() {
         measurements = mock(BlueprintMeasurementRepository.class);
+        phases = mock(PhaseRepository.class);
         MaterialFormulaRepository formulas = mock(MaterialFormulaRepository.class);
         PhaseTemplateRepository templates = mock(PhaseTemplateRepository.class);
         when(formulas.findByProjectTypeId(project.getProjectType().getId())).thenReturn(List.of(
@@ -55,7 +61,7 @@ class QuotationFacadeTest {
                         CatalogFixtures.phase(project.getProjectType(), SizeCategory.SMALL, 2, "Mampostería", 21)));
         ProjectCalculatorFactories factories = new ProjectCalculatorFactories(
                 List.of(new HouseCalculatorFactory(), new CommercialUnitCalculatorFactory()));
-        facade = new QuotationFacade(measurements, formulas, templates, factories,
+        facade = new QuotationFacade(measurements, formulas, phases, templates, factories,
                 new QuotationProperties(new BigDecimal("280000"), new BigDecimal("19")));
     }
 
@@ -75,6 +81,35 @@ class QuotationFacadeTest {
                 BudgetItemType.LABOR, BudgetItemType.TAX), quotation.lines().stream().map(CostLine::type).toList());
         // 200,000 + 10,000 + 6,300 + 7,280,000 + 19 % of 7,286,300.
         assertEquals(new BigDecimal("8880697.00"), quotation.total());
+    }
+
+    @Test
+    void workingDaysComeFromThePhasesWhenTheyHaveDates() {
+        when(measurements.findByProjectIdOrderByCreatedAtAsc(project.getId())).thenReturn(List.of(
+                BlueprintFixtures.measurement(project, MeasurementSource.MANUAL, ElementType.WALL, 1, "4", null,
+                        "2.5", 1)));
+        // Monday 2 to Saturday 14 of November: 12 working days.
+        when(phases.findByProjectIdOrderBySequenceOrderAsc(project.getId())).thenReturn(List.of(
+                new Phase(project, null, "Preliminares", 1,
+                        new WorkSchedule(LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 6))),
+                new Phase(project, null, "Mampostería", 2,
+                        new WorkSchedule(LocalDate.of(2026, 11, 7), LocalDate.of(2026, 11, 14)))));
+
+        Quotation quotation = facade.quoteProject(project);
+
+        assertEquals(Quotation.DaysSource.PHASES, quotation.getDaysSource());
+        assertEquals(12, quotation.getWorkingDays());
+    }
+
+    @Test
+    void phasesWithoutDatesFallBackToTheStandardPlan() {
+        when(measurements.findByProjectIdOrderByCreatedAtAsc(project.getId())).thenReturn(List.of(
+                BlueprintFixtures.measurement(project, MeasurementSource.MANUAL, ElementType.WALL, 1, "4", null,
+                        "2.5", 1)));
+        when(phases.findByProjectIdOrderBySequenceOrderAsc(project.getId())).thenReturn(List.of(
+                new Phase(project, null, "Preliminares", 1, new WorkSchedule(null, null))));
+
+        assertEquals(Quotation.DaysSource.STANDARD_PLAN, facade.quoteProject(project).getDaysSource());
     }
 
     @Test

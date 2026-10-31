@@ -1,5 +1,7 @@
 package com.obraia.backend.quotation;
 
+import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.stereotype.Component;
@@ -8,12 +10,16 @@ import com.obraia.backend.config.QuotationProperties;
 import com.obraia.backend.entity.blueprint.BlueprintMeasurement;
 import com.obraia.backend.entity.blueprint.MeasurementSource;
 import com.obraia.backend.entity.catalog.Location;
+import com.obraia.backend.entity.phase.Phase;
+import com.obraia.backend.entity.phase.WorkSchedule;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.planning.PlannedPhase;
 import com.obraia.backend.planning.ProjectCalculatorFactories;
+import com.obraia.backend.planning.WorkCalendar;
 import com.obraia.backend.repository.BlueprintMeasurementRepository;
 import com.obraia.backend.repository.MaterialFormulaRepository;
+import com.obraia.backend.repository.PhaseRepository;
 import com.obraia.backend.repository.PhaseTemplateRepository;
 
 /**
@@ -29,15 +35,18 @@ public class QuotationFacade {
 
     private final BlueprintMeasurementRepository measurementRepository;
     private final MaterialFormulaRepository formulaRepository;
+    private final PhaseRepository phaseRepository;
     private final PhaseTemplateRepository templateRepository;
     private final ProjectCalculatorFactories factories;
     private final QuotationProperties properties;
 
     public QuotationFacade(BlueprintMeasurementRepository measurementRepository,
-            MaterialFormulaRepository formulaRepository, PhaseTemplateRepository templateRepository,
-            ProjectCalculatorFactories factories, QuotationProperties properties) {
+            MaterialFormulaRepository formulaRepository, PhaseRepository phaseRepository,
+            PhaseTemplateRepository templateRepository, ProjectCalculatorFactories factories,
+            QuotationProperties properties) {
         this.measurementRepository = measurementRepository;
         this.formulaRepository = formulaRepository;
+        this.phaseRepository = phaseRepository;
         this.templateRepository = templateRepository;
         this.factories = factories;
         this.properties = properties;
@@ -71,8 +80,21 @@ public class QuotationFacade {
         return builder.cost(cost).build();
     }
 
-    /** Working days of the standard phases of the project type. */
+    /** From the dates of the phases when all have them; otherwise from the standard plan of the type. */
     private int workingDays(Project project, Quotation.Builder builder) {
+        List<WorkSchedule> schedules = phaseRepository.findByProjectIdOrderBySequenceOrderAsc(project.getId())
+                .stream().map(Phase::getSchedule).toList();
+        boolean dated = !schedules.isEmpty() && schedules.stream()
+                .allMatch(schedule -> schedule.getPlannedStartDate() != null && schedule.getPlannedEndDate() != null);
+        if (dated) {
+            LocalDate start = schedules.stream().map(WorkSchedule::getPlannedStartDate)
+                    .min(Comparator.naturalOrder()).orElseThrow();
+            LocalDate end = schedules.stream().map(WorkSchedule::getPlannedEndDate)
+                    .max(Comparator.naturalOrder()).orElseThrow();
+            int days = WorkCalendar.workingDaysBetween(start, end);
+            builder.workingDays(days, Quotation.DaysSource.PHASES);
+            return days;
+        }
         List<PlannedPhase> standard = factories.forType(project.getProjectType()).planPhases(
                 templateRepository.findByProjectTypeIdAndSizeCategoryOrderBySequenceOrderAsc(
                         project.getProjectType().getId(), project.getSizeCategory()),
