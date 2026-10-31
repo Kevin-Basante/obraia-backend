@@ -240,6 +240,20 @@ Con `MAIL_PROVIDER=log` los correos no se envían: el enlace aparece en la conso
 - Una obra terminada o cancelada no acepta planos ni medidas nuevas, pero se pueden seguir consultando.
 - Al borrar una obra para siempre (tarea de las 4:00 a. m.) también se borran los archivos de sus planos.
 
+## Cómo funcionan las fases y las tareas
+
+- **Patrón Factory Method:** cada tipo de obra tiene su fábrica, que hereda de `ProjectCalculatorFactory` y decide qué planificador de fases crear (`createPhasePlanner()`):
+  - `HouseCalculatorFactory` (Vivienda unifamiliar) crea `HousePhasePlanner`.
+  - `CommercialUnitCalculatorFactory` (Local comercial) crea `CommercialUnitPhasePlanner`, que agrega al final la fase "Adecuación comercial (fachada, vitrina y cortina metálica)" (7 días hábiles en obra pequeña, 10 en grande).
+  - Los servicios solo llaman a `planPhases(...)`, así que un tipo de obra nuevo es una clase nueva, sin cambiar los servicios. En el bloque 6 la misma fábrica creará el calculador de materiales.
+- El plan parte de las fases estándar del catálogo según el tamaño de la obra (pequeña hasta 120 m², grande desde ahí). Cada fase trae sus tareas iniciales, que se pueden editar, borrar o completar con tareas nuevas.
+- Las fechas se calculan en días hábiles de lunes a sábado desde la fecha de inicio planeada de la obra; si la obra no tiene fecha, las fases quedan sin fechas. Cada fase empieza el día hábil siguiente al fin de la anterior.
+- Estados de fases y tareas: `planned` → `in_progress` → `delayed` o `completed`. Una tarea o fase completada se puede reabrir (`in_progress`). Una fase o tarea está atrasada (`late`) si pasó su fecha de fin planeada y no está completada.
+- Reportar avance mueve la tarea: más de 0 % la inicia y 100 % la completa. La fase empieza con su primera tarea y se completa sola cuando todas sus tareas están completas. Una fase no se puede completar a mano si le faltan tareas.
+- El avance de una tarea es su último reporte (por fecha del reporte). El avance de una fase es el promedio de sus tareas y el de la obra es el promedio de todas las tareas.
+- El reporte puede indicar que lo dio el maestro de obra asignado (`fromSiteManager: true`); si la obra no tiene maestro asignado, la respuesta es 400. La fecha del reporte no puede ser futura y, si no se envía, es hoy (hora de Colombia).
+- El plan solo se puede crear una vez (409 `PHASES_ALREADY_CREATED`) y solo se puede borrar mientras no tenga reportes (409 `PHASES_HAVE_PROGRESS`).
+
 ## Estructura
 
 Arquitectura por capas: controladores → servicios → repositorios → base de datos.
