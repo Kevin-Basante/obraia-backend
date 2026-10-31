@@ -17,6 +17,7 @@ import com.obraia.backend.entity.expense.ExpenseCategory;
 import com.obraia.backend.entity.phase.Phase;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.exception.FieldValidationException;
+import com.obraia.backend.exception.ResourceNotFoundException;
 import com.obraia.backend.repository.ExpenseRepository;
 import com.obraia.backend.repository.PhaseRepository;
 import com.obraia.backend.repository.UserRepository;
@@ -76,5 +77,16 @@ public class ExpenseService {
                 userRepository.getReferenceById(userId), category, request.description().strip(), request.amount(),
                 expenseDate, clock.instant()));
         return ExpenseResponse.from(expense);
+    }
+
+    /** Removes an expense registered by mistake. */
+    @Transactional
+    public void delete(UUID projectId, UUID userId, UUID expenseId) {
+        Project project = accessService.requireProject(projectId, userId);
+        ProjectService.requireEditable(project);
+        Expense expense = expenseRepository.findByIdAndProjectId(expenseId, projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("EXPENSE_NOT_FOUND",
+                        "The expense " + expenseId + " does not exist in this project"));
+        expenseRepository.delete(expense);
     }
 }

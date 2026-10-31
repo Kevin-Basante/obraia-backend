@@ -30,6 +30,7 @@ import com.obraia.backend.entity.project.ProjectStatus;
 import com.obraia.backend.exception.BadRequestException;
 import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.exception.FieldValidationException;
+import com.obraia.backend.exception.ResourceNotFoundException;
 import com.obraia.backend.repository.ExpenseRepository;
 import com.obraia.backend.repository.PhaseRepository;
 import com.obraia.backend.repository.UserRepository;
@@ -126,6 +127,29 @@ class ExpenseServiceTest {
 
         assertThrows(ConflictException.class,
                 () -> service.create(closed.getId(), userId, request("materials", "1000", null)));
+    }
+
+    @Test
+    void deleteRemovesTheExpenseOfTheProject() {
+        Expense expense = new Expense(project, null, null, ExpenseCategory.OTHER, "Error", BigDecimal.TEN, TODAY,
+                CLOCK.instant());
+        UUID expenseId = UUID.randomUUID();
+        when(expenses.findByIdAndProjectId(expenseId, project.getId())).thenReturn(Optional.of(expense));
+
+        service.delete(project.getId(), userId, expenseId);
+
+        verify(expenses).delete(expense);
+    }
+
+    @Test
+    void deletingAnUnknownExpenseIsNotFound() {
+        UUID expenseId = UUID.randomUUID();
+        when(expenses.findByIdAndProjectId(expenseId, project.getId())).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class,
+                () -> service.delete(project.getId(), userId, expenseId));
+
+        assertEquals("EXPENSE_NOT_FOUND", ex.getCode());
     }
 
     @Test
