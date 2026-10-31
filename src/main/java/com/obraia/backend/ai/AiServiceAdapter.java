@@ -30,6 +30,8 @@ public class AiServiceAdapter implements AiServiceClient {
 
     static final String ANALYZE_PATH = "/api/v1/blueprints/analyze";
     static final String TOKEN_HEADER = "X-Service-Token";
+    /** Code of obraia-ia when Gemini stays overloaded after its retries. */
+    static final String BUSY_CODE = "ANALYZER_BUSY";
 
     private final RestClient restClient;
 
@@ -76,6 +78,9 @@ public class AiServiceAdapter implements AiServiceClient {
     private static AiServiceException failure(RestClientResponseException ex) {
         String message = "The AI service answered " + ex.getStatusCode().value();
         AiServiceError.Body error = errorBody(ex);
+        if (error != null && BUSY_CODE.equals(error.code())) {
+            return new AiServiceBusyException(ex);
+        }
         if (error != null && error.message() != null && !error.message().isBlank()) {
             message += ": " + error.message();
         }

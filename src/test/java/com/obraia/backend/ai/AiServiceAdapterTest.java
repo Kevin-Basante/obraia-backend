@@ -129,6 +129,33 @@ class AiServiceAdapterTest {
     }
 
     @Test
+    void busyModelBecomesAiServiceBusy() {
+        server.expect(requestTo(URL + AiServiceAdapter.ANALYZE_PATH))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\": {\"code\": \"ANALYZER_BUSY\", \"message\": \"Gemini is busy\"}}"));
+
+        AiServiceException ex = assertThrows(AiServiceBusyException.class, () -> adapter.analyze(REQUEST));
+
+        assertEquals("AI_SERVICE_BUSY", ex.getCode());
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ex.getStatus());
+        assertEquals(AiServiceBusyException.MESSAGE, ex.getMessage());
+    }
+
+    @Test
+    void otherServiceUnavailableAnswersStayAiServiceFailed() {
+        server.expect(requestTo(URL + AiServiceAdapter.ANALYZE_PATH))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\": {\"code\": \"ANALYZER_NOT_READY\", \"message\": \"No API key\"}}"));
+
+        AiServiceException ex = assertThrows(AiServiceException.class, () -> adapter.analyze(REQUEST));
+
+        assertEquals("AI_SERVICE_FAILED", ex.getCode());
+        assertEquals("The AI service answered 503: No API key", ex.getMessage());
+    }
+
+    @Test
     void errorPageThatIsNotJsonKeepsOnlyTheStatus() {
         server.expect(requestTo(URL + AiServiceAdapter.ANALYZE_PATH)).andRespond(withStatus(HttpStatus.BAD_GATEWAY)
                 .contentType(MediaType.TEXT_HTML)
