@@ -48,6 +48,8 @@ El archivo `.env` está en `.gitignore` y **nunca** se sube a GitHub.
 | `MAIL_FROM`    | Remitente de los correos (debe estar verificado en Brevo)               |
 | `BREVO_API_KEY`| Clave de la API de Brevo (solo si `MAIL_PROVIDER=brevo`)                |
 | `STORAGE_PROVIDER` | Dónde se guardan los planos: `database` (por defecto) o `local` (carpeta `uploads/`) |
+| `AI_SERVICE_URL` | URL del servicio de IA (`obraia-ia`), por ejemplo `http://localhost:8000`. Vacía apaga el análisis de planos |
+| `AI_SERVICE_TOKEN` | Clave compartida con el servicio de IA (su `SERVICE_TOKEN`) |
 | `PORT`         | Puerto del servidor (por defecto 8080; Render lo asigna solo)           |
 
 ## Comandos
@@ -370,6 +372,8 @@ Variables que se configuran en el panel de Render (no van en el repositorio):
 | `MAIL_PROVIDER`| `brevo` (o `log` mientras Brevo no esté configurado)     |
 | `MAIL_FROM`    | Correo remitente verificado en Brevo                     |
 | `BREVO_API_KEY`| Clave de la API de Brevo                                 |
+| `AI_SERVICE_URL` | URL del servicio `obraia-ia` en Render                 |
+| `AI_SERVICE_TOKEN` | El mismo valor de `SERVICE_TOKEN` en `obraia-ia`     |
 
 `STORAGE_PROVIDER` no hace falta en Render: por defecto los planos se guardan en la base de datos.
 
