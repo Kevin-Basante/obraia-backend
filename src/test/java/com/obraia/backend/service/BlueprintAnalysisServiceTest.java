@@ -135,6 +135,19 @@ class BlueprintAnalysisServiceTest {
     }
 
     @Test
+    void elementsOnAFloorTheProjectDoesNotHaveAreDiscarded() {
+        AiMeasurement upstairs = new AiMeasurement(ElementType.FLOOR, 2, new BigDecimal("8.00"),
+                new BigDecimal("6.00"), null, 1, null);
+        when(aiService.analyze(any())).thenReturn(analysis(List.of(WALL, upstairs), false));
+
+        BlueprintAnalysisResponse response = service.analyze(project.getId(), userId, blueprint.getId());
+
+        assertEquals(1, saved.size());
+        // One discarded by obraia-ia and one here.
+        assertEquals(2, response.discarded());
+    }
+
+    @Test
     void blueprintOfAnotherProjectIsNotFound() {
         assertThrows(ResourceNotFoundException.class,
                 () -> service.analyze(project.getId(), userId, UUID.randomUUID()));
