@@ -8,6 +8,11 @@ import com.obraia.backend.exception.AppException;
 public class AiServiceException extends AppException {
 
     public AiServiceException(String message, Throwable cause) {
-        super(HttpStatus.BAD_GATEWAY, "AI_SERVICE_FAILED", message, cause);
+        this(HttpStatus.BAD_GATEWAY, "AI_SERVICE_FAILED", message, cause);
+    }
+
+    /** For more specific failures of the AI service, with their own status and code. */
+    protected AiServiceException(HttpStatus status, String code, String message, Throwable cause) {
+        super(status, code, message, cause);
     }
 }
