@@ -1,5 +1,6 @@
 package com.obraia.backend.entity.catalog;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -24,6 +25,10 @@ public class Location {
     @Column(nullable = false, length = 60)
     private String country;
 
+    /** Cost of bringing the materials to the site, as a percentage of their price. */
+    @Column(name = "transport_pct", nullable = false, precision = 5, scale = 2)
+    private BigDecimal transportPct;
+
     protected Location() {
         // Required by JPA
     }
@@ -42,5 +47,9 @@ public class Location {
 
     public String getCountry() {
         return country;
+    }
+
+    public BigDecimal getTransportPct() {
+        return transportPct;
     }
 }
