@@ -1,6 +1,6 @@
 package com.obraia.backend.entity.blueprint;
 
-/** Progress of the AI reading of a blueprint. Every upload starts as pending (block 7 processes it). */
+/** Progress of the AI reading of a blueprint. Every upload starts as pending. */
 public enum ProcessingStatus {
 
     PENDING("pending", "Pending"),

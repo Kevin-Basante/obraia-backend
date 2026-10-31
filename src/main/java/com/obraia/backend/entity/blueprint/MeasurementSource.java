@@ -1,6 +1,6 @@
 package com.obraia.backend.entity.blueprint;
 
-/** Who took a measurement: the user by hand, or the AI reading the blueprint (block 7). */
+/** Who took a measurement: the user by hand, or the AI reading the blueprint. */
 public enum MeasurementSource {
 
     MANUAL("manual", "Manual"),
