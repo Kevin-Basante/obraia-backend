@@ -22,6 +22,7 @@ import com.obraia.backend.entity.expense.ExpenseCategory;
 import com.obraia.backend.entity.phase.Phase;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.event.BudgetChangedEvent;
+import com.obraia.backend.event.BudgetExceededEvent;
 import com.obraia.backend.event.ExpensesChangedEvent;
 import com.obraia.backend.exception.FieldValidationException;
 import com.obraia.backend.exception.ResourceNotFoundException;
@@ -131,10 +132,14 @@ public class ExpenseService {
         expenseRepository.flush();
         BigDecimal spent = expenseRepository.sumByProjectId(projectId);
         budgetRepository.findByProjectIdAndStatus(projectId, BudgetStatus.APPROVED).ifPresent(budget -> {
+            boolean wasWithinBudget = budget.getActualAmount().compareTo(budget.getProjectedAmount()) <= 0;
             budget.recordActual(spent);
             budgetRepository.save(budget);
             // The cached budget versions show actual_amount.
             events.publishEvent(new BudgetChangedEvent(projectId));
+            if (wasWithinBudget && spent.compareTo(budget.getProjectedAmount()) > 0) {
+                events.publishEvent(new BudgetExceededEvent(projectId, budget.getProjectedAmount(), spent));
+            }
         });
     }
 }
