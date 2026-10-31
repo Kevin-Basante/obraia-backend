@@ -132,6 +132,7 @@ Al arrancar, Flyway crea las tablas y carga los datos iniciales si todavía no e
 | POST   | `/api/projects/{id}/blueprints`                | Subir un plano (`multipart/form-data`, campo `file`)      |
 | GET    | `/api/projects/{id}/blueprints/{planoId}/file` | Abrir el archivo del plano                                |
 | DELETE | `/api/projects/{id}/blueprints/{planoId}`      | Borrar un plano (sus medidas se conservan)                |
+| POST   | `/api/projects/{id}/blueprints/{planoId}/analyze` | Leer el plano con la IA y guardar sus medidas          |
 
 ### Medidas (requieren token)
 
