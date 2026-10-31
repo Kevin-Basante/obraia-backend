@@ -2,6 +2,7 @@ package com.obraia.backend.ai;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -65,6 +66,52 @@ class AiServiceProxyTest {
         assertTrue(proxy.available());
         verify(provider, times(1)).getObject();
         verify(adapter, times(2)).analyze(any());
+    }
+
+    @Test
+    void theSameFileIsAnsweredFromTheCache() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 5, 10);
+
+        BlueprintAnalysis first = proxy.analyze(request("plano", 1));
+        BlueprintAnalysis second = proxy.analyze(request("plano", 1));
+
+        assertFalse(first.cached());
+        assertTrue(second.cached());
+        verify(adapter, times(1)).analyze(any());
+    }
+
+    @Test
+    void theSameFileWithOtherFloorsIsReadAgain() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 5, 10);
+
+        proxy.analyze(request("plano", 1));
+        proxy.analyze(request("plano", 2));
+
+        verify(adapter, times(2)).analyze(any());
+        assertNotEquals(AiServiceProxy.cacheKey(request("plano", 1)), AiServiceProxy.cacheKey(request("plano", 2)));
+    }
+
+    @Test
+    void theOldestAnalysisLeavesTheCacheWhenItIsFull() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 10, 2);
+
+        proxy.analyze(request("plano 1", 1));
+        proxy.analyze(request("plano 2", 1));
+        proxy.analyze(request("plano 3", 1));
+        proxy.analyze(request("plano 1", 1));
+
+        verify(adapter, times(4)).analyze(any());
+    }
+
+    @Test
+    void aFailedCallIsNotCached() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 5, 10);
+        when(adapter.analyze(any())).thenThrow(new AiServiceException("The AI service answered 502", null))
+                .thenReturn(ANSWER);
+
+        assertThrows(AiServiceException.class, () -> proxy.analyze(request("plano", 1)));
+
+        assertFalse(proxy.analyze(request("plano", 1)).cached());
     }
 
     private AiServiceProxy proxy(String baseUrl, int maxAnalyses, int cacheSize) {
