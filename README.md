@@ -141,6 +141,23 @@ Al arrancar, Flyway crea las tablas y carga los datos iniciales si todavía no e
 | DELETE | `/api/projects/{id}/measurements/{medidaId}`      | Borrar una medida manual                                 |
 | GET    | `/api/projects/{id}/measurements/comparison`      | Totales manuales contra los de la IA, por elemento y piso |
 
+### Fases y tareas (requieren token)
+
+| Método | Ruta                                               | Qué hace                                                      |
+| ------ | -------------------------------------------------- | ------------------------------------------------------------- |
+| GET    | `/api/projects/{id}/phases`                        | Fases con sus tareas y el avance de la obra                   |
+| GET    | `/api/projects/{id}/phases/preview`                | Ver las fases que tendría el plan, sin guardarlas             |
+| POST   | `/api/projects/{id}/phases/generate`               | Crear el plan con las fases estándar del tipo de obra         |
+| DELETE | `/api/projects/{id}/phases`                        | Borrar el plan (solo si no tiene reportes de avance)          |
+| PUT    | `/api/projects/{id}/phases/{faseId}`               | Cambiar el nombre o las fechas planeadas de una fase          |
+| PATCH  | `/api/projects/{id}/phases/{faseId}/status`        | Cambiar el estado de una fase                                 |
+| POST   | `/api/projects/{id}/tasks`                         | Agregar una tarea a una fase                                  |
+| PUT    | `/api/projects/{id}/tasks/{tareaId}`               | Editar una tarea (o pasarla a otra fase)                      |
+| DELETE | `/api/projects/{id}/tasks/{tareaId}`               | Borrar una tarea con sus reportes                             |
+| PATCH  | `/api/projects/{id}/tasks/{tareaId}/status`        | Cambiar el estado de una tarea                                |
+| GET    | `/api/projects/{id}/tasks/{tareaId}/progress`      | Reportes de avance de la tarea, del más nuevo al más viejo    |
+| POST   | `/api/projects/{id}/tasks/{tareaId}/progress`      | Reportar el avance de la tarea (0 a 100 %)                    |
+
 ### Maestros de obra (requieren token)
 
 | Método | Ruta                       | Qué hace                         |
