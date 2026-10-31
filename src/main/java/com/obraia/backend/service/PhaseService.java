@@ -95,6 +95,18 @@ public class PhaseService {
         return views.plan(projectId);
     }
 
+    /** Deletes the phases and their tasks, only while nobody reported progress. */
+    @Transactional
+    public void reset(UUID projectId, UUID userId) {
+        Project project = accessService.requireProject(projectId, userId);
+        ProjectService.requireEditable(project);
+        if (reportRepository.existsByTaskPhaseProjectId(projectId)) {
+            throw new ConflictException("PHASES_HAVE_PROGRESS",
+                    "The plan has progress reports, so it cannot be deleted");
+        }
+        phaseRepository.deleteByProjectId(projectId);
+    }
+
     private List<PlannedPhase> plannedPhases(Project project) {
         LocalDate start = project.getPlannedStartDate();
         return factories.forType(project.getProjectType()).planPhases(
