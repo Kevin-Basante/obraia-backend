@@ -23,6 +23,7 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import com.obraia.backend.dto.expense.ExpenseRequest;
 import com.obraia.backend.dto.expense.ExpenseResponse;
+import com.obraia.backend.dto.expense.ExpenseSummaryResponse;
 import com.obraia.backend.entity.budget.Budget;
 import com.obraia.backend.entity.budget.BudgetStatus;
 import com.obraia.backend.entity.expense.Expense;
@@ -36,6 +37,7 @@ import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.exception.FieldValidationException;
 import com.obraia.backend.exception.ResourceNotFoundException;
 import com.obraia.backend.repository.BudgetRepository;
+import com.obraia.backend.repository.ExpenseCategoryTotal;
 import com.obraia.backend.repository.ExpenseRepository;
 import com.obraia.backend.repository.PhaseRepository;
 import com.obraia.backend.repository.UserRepository;
@@ -184,6 +186,50 @@ class ExpenseServiceTest {
 
         verify(budgets, never()).save(any());
         verify(events, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void summaryComparesTheExpensesWithTheApprovedBudget() {
+        when(expenses.totalsByCategory(project.getId())).thenReturn(List.of(
+                new ExpenseCategoryTotal(ExpenseCategory.LABOR, new BigDecimal("400000.00"), 2L),
+                new ExpenseCategoryTotal(ExpenseCategory.MATERIALS, new BigDecimal("1250000.00"), 3L)));
+        when(expenses.sumByProjectId(project.getId())).thenReturn(new BigDecimal("1650000.00"));
+        when(budgets.findByProjectIdAndStatus(project.getId(), BudgetStatus.APPROVED))
+                .thenReturn(Optional.of(BudgetFixtures.approved(project, 1, "5000000.00")));
+
+        ExpenseSummaryResponse summary = service.summary(project.getId(), userId);
+
+        verify(access).requireMembership(project.getId(), userId);
+        assertEquals(new BigDecimal("1650000.00"), summary.totalSpent());
+        assertEquals(new BigDecimal("3350000.00"), summary.remaining());
+        assertEquals(new BigDecimal("33.00"), summary.spentPct());
+        assertEquals("materials", summary.byCategory().get(0).category().code());
+        assertEquals(3, summary.byCategory().get(0).count());
+    }
+
+    @Test
+    void summaryWithoutApprovedBudgetHasOnlyTheTotals() {
+        when(expenses.totalsByCategory(project.getId())).thenReturn(List.of());
+
+        ExpenseSummaryResponse summary = service.summary(project.getId(), userId);
+
+        assertEquals(BigDecimal.ZERO, summary.totalSpent());
+        assertEquals(null, summary.approvedBudget());
+        assertEquals(null, summary.spentPct());
+        assertEquals(List.of(), summary.byCategory());
+    }
+
+    @Test
+    void remainingIsNegativeWhenTheBudgetIsPassed() {
+        when(expenses.totalsByCategory(project.getId())).thenReturn(List.of());
+        when(expenses.sumByProjectId(project.getId())).thenReturn(new BigDecimal("5500000.00"));
+        when(budgets.findByProjectIdAndStatus(project.getId(), BudgetStatus.APPROVED))
+                .thenReturn(Optional.of(BudgetFixtures.approved(project, 1, "5000000.00")));
+
+        ExpenseSummaryResponse summary = service.summary(project.getId(), userId);
+
+        assertEquals(new BigDecimal("-500000.00"), summary.remaining());
+        assertEquals(new BigDecimal("110.00"), summary.spentPct());
     }
 
     @Test
