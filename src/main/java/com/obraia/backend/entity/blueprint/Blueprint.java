@@ -75,6 +75,11 @@ public class Blueprint {
         this.storageProvider = storageProvider;
     }
 
+    /** The AI read the blueprint and its measurements were saved. */
+    public void markCompleted() {
+        this.processingStatus = ProcessingStatus.COMPLETED;
+    }
+
     public UUID getId() {
         return id;
     }
