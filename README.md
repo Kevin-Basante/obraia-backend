@@ -102,9 +102,14 @@ Al arrancar, Flyway crea las tablas y carga los datos iniciales si todavía no e
 
 ### Usuario (requieren token)
 
-| Método | Ruta            | Qué hace                         |
-| ------ | --------------- | -------------------------------- |
-| GET    | `/api/users/me` | Datos del usuario que inició sesión |
+| Método | Ruta                             | Qué hace                                                      |
+| ------ | -------------------------------- | ------------------------------------------------------------- |
+| GET    | `/api/users/me`                  | Datos del usuario que inició sesión                           |
+| PUT    | `/api/users/me`                  | Cambiar nombre, apellido y teléfono                           |
+| POST   | `/api/users/me/password`         | Cambiar la contraseña (pide la actual y cierra las sesiones)  |
+| GET    | `/api/users/me/deletion-impact`  | Lo que se perdería al eliminar la cuenta                      |
+| POST   | `/api/users/me/deletion-request` | Pedir la eliminación con la contraseña; envía el correo       |
+| POST   | `/api/users/deletion/confirm`    | Confirmar la eliminación con el token del correo (pública)    |
 
 ### Obras (requieren token)
 
