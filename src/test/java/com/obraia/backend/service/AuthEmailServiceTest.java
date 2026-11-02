@@ -48,6 +48,15 @@ class AuthEmailServiceTest {
     }
 
     @Test
+    void passwordChangedEmailLinksToTheForgotPasswordPage() {
+        service.sendPasswordChangedEmail(user);
+
+        EmailMessage message = captureMessage();
+        assertEquals("Your ObraIA password was changed", message.subject());
+        assertTrue(message.htmlContent().contains("https://obraia-frontend.vercel.app/forgot-password"));
+    }
+
+    @Test
     void userNameIsEscapedInTheHtml() {
         service.sendVerificationEmail(user, "abc");
 

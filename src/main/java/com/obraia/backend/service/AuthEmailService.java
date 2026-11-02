@@ -53,6 +53,16 @@ public class AuthEmailService {
         deliver(new EmailMessage(user.getEmail(), fullName(user), "Reset your ObraIA password", html));
     }
 
+    /** Warns the owner, so a change made by someone else does not go unnoticed. */
+    public void sendPasswordChangedEmail(User user) {
+        String html = """
+                <p>Hi %s,</p>
+                <p>The password of your ObraIA account was just changed, and every open session was closed.</p>
+                <p>If it was not you, <a href="%s/forgot-password">reset your password</a> right away.</p>
+                """.formatted(EmailText.escape(user.getFirstName()), frontendBaseUrl);
+        deliver(new EmailMessage(user.getEmail(), fullName(user), "Your ObraIA password was changed", html));
+    }
+
     String buildLink(String path, String token) {
         return frontendBaseUrl + path + "?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
     }
