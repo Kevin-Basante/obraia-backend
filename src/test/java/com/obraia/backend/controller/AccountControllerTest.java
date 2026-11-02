@@ -29,6 +29,7 @@ import com.obraia.backend.dto.auth.MessageResponse;
 import com.obraia.backend.dto.user.AccountDeletionImpactResponse;
 import com.obraia.backend.exception.FieldValidationException;
 import com.obraia.backend.exception.GlobalExceptionHandler;
+import com.obraia.backend.exception.InvalidTokenException;
 import com.obraia.backend.service.AccountDeletionService;
 import com.obraia.backend.service.AccountService;
 
@@ -114,5 +115,26 @@ class AccountControllerTest {
         mvc.perform(post("/api/users/me/deletion-request").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.fields.password").exists());
+    }
+
+    @Test
+    void confirmDeletionAnswers200() throws Exception {
+        when(deletionService.confirmDeletion(eq("abc"), any()))
+                .thenReturn(new MessageResponse("Your account was deleted."));
+
+        mvc.perform(post("/api/users/deletion/confirm").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"abc\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Your account was deleted."));
+    }
+
+    @Test
+    void confirmDeletionWithABadLinkIs400() throws Exception {
+        when(deletionService.confirmDeletion(eq("old"), any())).thenThrow(InvalidTokenException.deletionLink());
+
+        mvc.perform(post("/api/users/deletion/confirm").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"old\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_DELETION_TOKEN"));
     }
 }
