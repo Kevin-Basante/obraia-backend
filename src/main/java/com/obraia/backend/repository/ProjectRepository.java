@@ -57,6 +57,11 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
             """)
     long countJoinedBy(@Param("userId") UUID userId);
 
+    /** Hides every project the user created, when the account is deleted. */
+    @Modifying
+    @Query("UPDATE Project p SET p.deletedAt = :when WHERE p.createdBy = :userId AND p.deletedAt IS NULL")
+    int markDeletedByCreator(@Param("userId") UUID userId, @Param("when") Instant when);
+
     /** Removes for good the projects deleted before the limit. Their related rows go with them (ON DELETE CASCADE). */
     @Modifying
     @Query("DELETE FROM Project p WHERE p.deletedAt < :limit")
