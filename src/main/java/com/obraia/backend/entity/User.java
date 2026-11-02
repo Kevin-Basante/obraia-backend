@@ -95,6 +95,13 @@ public class User {
         }
     }
 
+    /** Name and phone. Blank parts are stored without the spaces around them; a blank phone is removed. */
+    public void updateProfile(String firstName, String lastName, String phone) {
+        this.firstName = firstName.strip();
+        this.lastName = lastName.strip();
+        this.phone = phone == null || phone.isBlank() ? null : phone.strip();
+    }
+
     public void addRole(Role role) {
         roles.add(role);
     }
