@@ -89,6 +89,11 @@ public class User {
         return active && deletedAt == null;
     }
 
+    /** Hides the account. It is removed for good later (see AccountPurgeService). */
+    public void markDeleted(Instant when) {
+        this.deletedAt = when;
+    }
+
     public void markEmailVerified(Instant when) {
         if (emailVerifiedAt == null) {
             emailVerifiedAt = when;
