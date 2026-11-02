@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.obraia.backend.dto.auth.MessageResponse;
 import com.obraia.backend.exception.FieldValidationException;
 import com.obraia.backend.exception.GlobalExceptionHandler;
+import com.obraia.backend.service.AccountDeletionService;
 import com.obraia.backend.service.AccountService;
 
 /** HTTP side of the account security routes, without the database. */
@@ -33,6 +34,7 @@ class AccountControllerTest {
     private final UUID userId = UUID.randomUUID();
 
     private AccountService accountService;
+    private AccountDeletionService deletionService;
     private MockMvc mvc;
 
     @BeforeEach
@@ -40,7 +42,8 @@ class AccountControllerTest {
         Jwt jwt = Jwt.withTokenValue("token").header("alg", "HS256").subject(userId.toString()).build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
         accountService = mock(AccountService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new AccountController(accountService))
+        deletionService = mock(AccountDeletionService.class);
+        mvc = MockMvcBuilders.standaloneSetup(new AccountController(accountService, deletionService))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
