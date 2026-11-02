@@ -9,7 +9,9 @@ public enum AuditEvent {
     LOGOUT("logout"),
     TOKEN_REFRESHED("token_refreshed"),
     PASSWORD_RESET_REQUESTED("password_reset_requested"),
-    PASSWORD_CHANGED("password_changed");
+    PASSWORD_CHANGED("password_changed"),
+    DELETION_REQUESTED("deletion_requested"),
+    ACCOUNT_DELETED("account_deleted");
 
     private final String value;
 
