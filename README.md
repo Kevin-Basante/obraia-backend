@@ -230,6 +230,17 @@ Los mensajes de "correo enviado" son iguales exista o no la cuenta, para que nad
 
 Con `MAIL_PROVIDER=log` los correos no se envían: el enlace aparece en la consola del servidor, para probar en local.
 
+## Cómo funciona la cuenta
+
+- **Perfil:** el usuario cambia su nombre, apellido y teléfono. El correo no se cambia. Un teléfono vacío se borra.
+- **Cambiar la contraseña:** pide la contraseña actual y la nueva debe ser distinta. Al cambiarla se cierran todas las sesiones (también la actual), se guarda el evento `password_changed` y llega un correo de aviso.
+- **Eliminar la cuenta** (dos pasos, como una obra):
+  1. El frontend pide `deletion-impact` y muestra las advertencias: obras que creó el usuario (se eliminan con la cuenta), cuáles de ellas tienen otros miembros (ellos también las pierden) y en cuántas obras de otras personas participa (solo sale de ellas).
+  2. El usuario escribe su contraseña. El backend envía un correo con un enlace que vence en 30 minutos. Si el correo no sale, la solicitud se cancela (503).
+  3. El enlace abre el frontend (`/confirm-account-deletion?token=...`), que llama a `/api/users/deletion/confirm`. La cuenta ya no puede iniciar sesión, sus obras desaparecen, sale de las obras de otros y se cierran todas sus sesiones.
+  4. Los datos se guardan 30 días. Una tarea diaria (4:15 a. m., hora de Colombia, después de la purga de obras) borra la cuenta para siempre. El mismo correo puede registrarse otra vez desde que la cuenta se elimina.
+- Las solicitudes y las eliminaciones quedan en `auth_audit_logs` (`deletion_requested`, `account_deleted`).
+
 ## Cómo funcionan los catálogos
 
 - Los datos vienen de la migración V3 y no cambian mientras el servidor está encendido. Por eso el backend los guarda en memoria (caché) después de la primera consulta y no vuelve a preguntarle a la base de datos.
