@@ -1,8 +1,10 @@
 package com.obraia.backend.config;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -182,6 +184,24 @@ class SecurityRulesTest {
         mvc.perform(get("/api/projects").header("Authorization", "Bearer not-a-jwt"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("INVALID_ACCESS_TOKEN"));
+    }
+
+    @Test
+    void theFrontendCanAskBeforeCalling() throws Exception {
+        mvc.perform(options("/api/projects")
+                .header("Origin", "https://obraia-frontend.vercel.app")
+                .header("Access-Control-Request-Method", "GET")
+                .header("Access-Control-Request-Headers", "Authorization"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://obraia-frontend.vercel.app"));
+    }
+
+    @Test
+    void otherSitesCannotCallTheApi() throws Exception {
+        mvc.perform(options("/api/projects")
+                .header("Origin", "https://evil.example.com")
+                .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isForbidden());
     }
 
     private String token(String issuer, String subject, Instant expiresAt) {
