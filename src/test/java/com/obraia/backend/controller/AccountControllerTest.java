@@ -1,0 +1,83 @@
+package com.obraia.backend.controller;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.Map;
+import java.util.UUID;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import com.obraia.backend.dto.auth.MessageResponse;
+import com.obraia.backend.exception.FieldValidationException;
+import com.obraia.backend.exception.GlobalExceptionHandler;
+import com.obraia.backend.service.AccountService;
+
+/** HTTP side of the account security routes, without the database. */
+class AccountControllerTest {
+
+    private final UUID userId = UUID.randomUUID();
+
+    private AccountService accountService;
+    private MockMvc mvc;
+
+    @BeforeEach
+    void setUp() {
+        Jwt jwt = Jwt.withTokenValue("token").header("alg", "HS256").subject(userId.toString()).build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+        accountService = mock(AccountService.class);
+        mvc = MockMvcBuilders.standaloneSetup(new AccountController(accountService))
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void changePasswordAnswers200() throws Exception {
+        when(accountService.changePassword(eq(userId), any(), any()))
+                .thenReturn(new MessageResponse("Your password was changed. Sign in again with the new password."));
+
+        mvc.perform(post("/api/users/me/password").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"currentPassword\":\"Password123\",\"newPassword\":\"NewPassword456\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void aWeakNewPasswordIs400() throws Exception {
+        mvc.perform(post("/api/users/me/password").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"currentPassword\":\"Password123\",\"newPassword\":\"short\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.fields.newPassword").exists());
+    }
+
+    @Test
+    void aWrongCurrentPasswordIs400OnThatField() throws Exception {
+        when(accountService.changePassword(eq(userId), any(), any()))
+                .thenThrow(new FieldValidationException(Map.of("currentPassword", "is not correct")));
+
+        mvc.perform(post("/api/users/me/password").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"currentPassword\":\"Wrong123\",\"newPassword\":\"NewPassword456\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.fields.currentPassword").value("is not correct"));
+    }
+}
