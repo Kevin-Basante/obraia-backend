@@ -20,6 +20,7 @@ import jakarta.persistence.Table;
 public class DeletionRequest {
 
     public static final String TARGET_PROJECT = "project";
+    public static final String TARGET_ACCOUNT = "account";
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
