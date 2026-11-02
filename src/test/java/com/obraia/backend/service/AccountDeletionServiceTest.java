@@ -1,9 +1,14 @@
 package com.obraia.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -30,6 +35,7 @@ import com.obraia.backend.entity.AuditEvent;
 import com.obraia.backend.entity.User;
 import com.obraia.backend.entity.project.DeletionRequest;
 import com.obraia.backend.exception.FieldValidationException;
+import com.obraia.backend.exception.InvalidTokenException;
 import com.obraia.backend.repository.DeletionRequestRepository;
 import com.obraia.backend.repository.ProjectMemberRepository;
 import com.obraia.backend.repository.ProjectRepository;
@@ -114,5 +120,53 @@ class AccountDeletionServiceTest {
         assertEquals("is not correct", ex.getFields().get("password"));
         verify(emails, never()).sendDeletionConfirmation(any(), any(), any(), any());
         verify(requests, never()).save(any());
+    }
+
+    @Test
+    void confirmingHidesTheAccountAndItsProjects() {
+        givenRequest(DeletionRequest.TARGET_ACCOUNT, NOW.plusSeconds(60));
+
+        String message = service.confirmDeletion("token-123", client).message();
+
+        assertNotNull(user.getDeletedAt());
+        assertFalse(user.canSignIn());
+        verify(projects).markDeletedByCreator(user.getId(), NOW);
+        verify(members).deleteFromOthersProjects(user.getId());
+        verify(refreshTokens).revokeAll(user.getId());
+        verify(audit).record(AuditEvent.ACCOUNT_DELETED, user.getId(), "ana@example.com", client);
+        assertTrue(message.contains("2026-12-02"));
+    }
+
+    @Test
+    void expiredLinkIsRejected() {
+        givenRequest(DeletionRequest.TARGET_ACCOUNT, NOW.minusSeconds(1));
+
+        InvalidTokenException ex = assertThrows(InvalidTokenException.class,
+                () -> service.confirmDeletion("token-123", client));
+
+        assertEquals("INVALID_DELETION_TOKEN", ex.getCode());
+        assertNull(user.getDeletedAt());
+    }
+
+    @Test
+    void aProjectLinkCannotDeleteTheAccount() {
+        givenRequest(DeletionRequest.TARGET_PROJECT, NOW.plusSeconds(60));
+
+        assertThrows(InvalidTokenException.class, () -> service.confirmDeletion("token-123", client));
+        assertNull(user.getDeletedAt());
+        verify(projects, never()).markDeletedByCreator(any(), any());
+    }
+
+    @Test
+    void unknownLinkIsRejected() {
+        when(requests.findByTokenHash(anyString())).thenReturn(Optional.empty());
+
+        assertThrows(InvalidTokenException.class, () -> service.confirmDeletion("nope", client));
+    }
+
+    private void givenRequest(String targetType, Instant expiresAt) {
+        DeletionRequest request = new DeletionRequest(user.getId(), targetType, user.getId(),
+                TokenHasher.hash("token-123"), expiresAt);
+        when(requests.findByTokenHash(TokenHasher.hash("token-123"))).thenReturn(Optional.of(request));
     }
 }
