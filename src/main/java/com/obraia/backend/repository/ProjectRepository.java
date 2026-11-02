@@ -36,6 +36,27 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
 
     Optional<Project> findByIdAndDeletedAtIsNull(UUID id);
 
+    /** Projects the user created, by name. They are deleted with the account. */
+    @Query("SELECT p FROM Project p WHERE p.createdBy = :userId AND p.deletedAt IS NULL ORDER BY p.name")
+    List<Project> findOwnedBy(@Param("userId") UUID userId);
+
+    /** Projects the user created that other people also work on. They lose them too. */
+    @Query("""
+            SELECT p FROM Project p
+            WHERE p.createdBy = :userId AND p.deletedAt IS NULL
+              AND EXISTS (SELECT 1 FROM ProjectMember m WHERE m.project = p AND m.user.id <> :userId)
+            ORDER BY p.name
+            """)
+    List<Project> findSharedOwnedBy(@Param("userId") UUID userId);
+
+    /** Projects of other people where the user is a member. Only the membership is removed. */
+    @Query("""
+            SELECT count(p) FROM Project p
+            WHERE p.createdBy <> :userId AND p.deletedAt IS NULL
+              AND EXISTS (SELECT 1 FROM ProjectMember m WHERE m.project = p AND m.user.id = :userId)
+            """)
+    long countJoinedBy(@Param("userId") UUID userId);
+
     /** Removes for good the projects deleted before the limit. Their related rows go with them (ON DELETE CASCADE). */
     @Modifying
     @Query("DELETE FROM Project p WHERE p.deletedAt < :limit")
