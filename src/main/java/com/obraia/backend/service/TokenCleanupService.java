@@ -1,5 +1,6 @@
 package com.obraia.backend.service;
 
+import java.time.Clock;
 import java.time.Instant;
 
 import org.slf4j.Logger;
@@ -21,20 +22,22 @@ public class TokenCleanupService {
     private final RefreshTokenRepository refreshTokens;
     private final EmailVerificationTokenRepository verificationTokens;
     private final PasswordResetTokenRepository resetTokens;
+    private final Clock clock;
 
     public TokenCleanupService(RefreshTokenRepository refreshTokens,
             EmailVerificationTokenRepository verificationTokens,
-            PasswordResetTokenRepository resetTokens) {
+            PasswordResetTokenRepository resetTokens, Clock clock) {
         this.refreshTokens = refreshTokens;
         this.verificationTokens = verificationTokens;
         this.resetTokens = resetTokens;
+        this.clock = clock;
     }
 
     /** Every day at 3:30 a.m. Colombia time. */
     @Scheduled(cron = "0 30 3 * * *", zone = "America/Bogota")
     @Transactional
     public void deleteExpiredTokens() {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         int refresh = refreshTokens.deleteExpired(now);
         int verification = verificationTokens.deleteExpired(now);
         int reset = resetTokens.deleteExpired(now);
