@@ -6,13 +6,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.web.SpringJUnitWebConfig;
 import org.springframework.test.web.servlet.MockMvc;
@@ -92,13 +103,16 @@ class SecurityRulesTest {
         }
 
         @GetMapping("/api/users/me")
-        String me() {
-            return "me";
+        String me(@AuthenticationPrincipal Jwt jwt) {
+            return jwt.getSubject();
         }
     }
 
     @Autowired
     private WebApplicationContext context;
+
+    @Autowired
+    private JwtEncoder jwtEncoder;
 
     private MockMvc mvc;
 
@@ -133,5 +147,52 @@ class SecurityRulesTest {
     @Test
     void catalogsAreOnlyPublicForReading() throws Exception {
         mvc.perform(post("/api/catalogs/materials")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void aValidTokenOpensTheProtectedRoutes() throws Exception {
+        String userId = UUID.randomUUID().toString();
+        String token = token("obraia-backend", userId, Instant.now().plusSeconds(600));
+
+        mvc.perform(get("/api/users/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(content().string(userId));
+    }
+
+    @Test
+    void anExpiredTokenIsRejected() throws Exception {
+        String token = token("obraia-backend", UUID.randomUUID().toString(), Instant.now().minusSeconds(3600));
+
+        mvc.perform(get("/api/projects").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("INVALID_ACCESS_TOKEN"));
+    }
+
+    @Test
+    void aTokenFromAnotherIssuerIsRejected() throws Exception {
+        String token = token("someone-else", UUID.randomUUID().toString(), Instant.now().plusSeconds(600));
+
+        mvc.perform(get("/api/projects").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("INVALID_ACCESS_TOKEN"));
+    }
+
+    @Test
+    void aMadeUpTokenIsRejected() throws Exception {
+        mvc.perform(get("/api/projects").header("Authorization", "Bearer not-a-jwt"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("INVALID_ACCESS_TOKEN"));
+    }
+
+    private String token(String issuer, String subject, Instant expiresAt) {
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(issuer)
+                .subject(subject)
+                .issuedAt(expiresAt.minusSeconds(900))
+                .expiresAt(expiresAt)
+                .claim("roles", List.of("user"))
+                .build();
+        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
+        return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }
 }
