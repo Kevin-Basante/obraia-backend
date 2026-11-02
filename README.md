@@ -31,6 +31,19 @@ Las claves (base de datos, JWT, Brevo, servicio de IA) solo están en las variab
 
 Dentro del backend, cada petición pasa por: filtro de seguridad (token JWT) → controlador → servicio → repositorio → base de datos.
 
+## Flujo completo
+
+Así se usa ObraIA de principio a fin (es el recorrido de la demostración):
+
+1. **Cuenta:** el usuario se registra, confirma su correo con el enlace e inicia sesión.
+2. **Obra:** crea una obra (tipo, ciudad, área y pisos) y, si quiere, agrega a otro usuario como miembro y asigna un maestro de obra.
+3. **Planos:** sube una foto o un PDF del plano. La IA lo lee y guarda las medidas de cada elemento; el usuario también puede registrar medidas a mano y compararlas.
+4. **Fases:** el sistema crea las fases y tareas según el tipo y el tamaño de la obra (Factory Method y Template Method).
+5. **Cotización:** calcula los materiales y el costo con desperdicio, transporte de la ciudad, mano de obra e IVA (Facade y Decorator). Cada cotización se guarda como una versión del presupuesto.
+6. **Aprobación:** el usuario aprueba una versión y todos los miembros reciben una notificación.
+7. **Seguimiento:** registra los gastos y el avance de las tareas. Después de cada uno se evalúa el riesgo de la obra (Strategy y Observer) y, si se pasa del presupuesto o el riesgo sube, llega una notificación.
+8. **Cierre:** al terminar, la obra pasa a `completed`. El usuario puede eliminar una obra o su cuenta con confirmación por correo; los datos se borran para siempre a los 30 días.
+
 ## Tecnologías
 
 - Java 17 + Spring Boot 4
