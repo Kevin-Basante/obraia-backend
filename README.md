@@ -6,6 +6,31 @@ Proyecto final de Patrones de Software: Kevin Basante y Arley Riascos.
 El backend es la única capa que se comunica con la base de datos y con el servicio de IA.
 El frontend solo conoce la URL de esta API.
 
+## Arquitectura
+
+El sistema tiene cuatro capas y cada una se despliega por separado:
+
+```mermaid
+flowchart LR
+    U[Usuario en el navegador] --> F["Frontend<br/>React + Vite<br/>(Vercel)"]
+    F -- "HTTPS + JSON<br/>token JWT" --> B["Backend<br/>Spring Boot<br/>(Render)"]
+    B -- "JDBC + Flyway" --> D[("PostgreSQL<br/>(Neon)")]
+    B -- "HTTPS + clave compartida" --> I["Servicio de IA<br/>FastAPI<br/>(Render)"]
+    I -- "lee el plano" --> G[Gemini]
+    B -- "API HTTP" --> M[Brevo: correos]
+```
+
+| Capa | Repositorio | Qué hace |
+| ---- | ----------- | -------- |
+| Presentación | `obraia-frontend` | Pantallas de la aplicación. Solo habla con este backend |
+| Lógica de negocio | `obraia-backend` (este) | Autenticación, obras, planos, fases, cotización, gastos, riesgo y notificaciones |
+| Datos | `obraia-backend/src/main/resources/db/migration` | Tablas y datos iniciales de PostgreSQL, creados por Flyway |
+| Inteligencia artificial | `obraia-ia` | Lee los planos y devuelve las medidas de cada elemento |
+
+Las claves (base de datos, JWT, Brevo, servicio de IA) solo están en las variables de entorno del backend y de `obraia-ia`.
+
+Dentro del backend, cada petición pasa por: filtro de seguridad (token JWT) → controlador → servicio → repositorio → base de datos.
+
 ## Tecnologías
 
 - Java 17 + Spring Boot 4
