@@ -18,8 +18,13 @@ public class BrevoEmailSender implements EmailSender {
     private final MailProperties properties;
 
     public BrevoEmailSender(MailProperties properties) {
+        this(properties, RestClient.builder());
+    }
+
+    /** The tests pass a builder bound to a fake server, so no real email is sent. */
+    BrevoEmailSender(MailProperties properties, RestClient.Builder builder) {
         this.properties = properties;
-        this.restClient = RestClient.builder()
+        this.restClient = builder
                 .baseUrl(BREVO_API_URL)
                 .defaultHeader("api-key", properties.brevoApiKey())
                 .build();
