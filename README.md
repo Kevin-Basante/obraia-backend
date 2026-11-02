@@ -82,10 +82,24 @@ El archivo `.env` está en `.gitignore` y **nunca** se sube a GitHub.
 | Comando (Windows)                 | Comando (Mac / Linux)          | Qué hace                                  |
 | --------------------------------- | ------------------------------ | ----------------------------------------- |
 | `.\mvnw.cmd spring-boot:run`      | `./mvnw spring-boot:run`       | Inicia el servidor en modo desarrollo     |
-| `.\mvnw.cmd test`                 | `./mvnw test`                  | Ejecuta las pruebas unitarias             |
+| `.\mvnw.cmd test`                 | `./mvnw test`                  | Ejecuta las pruebas y genera el informe de cobertura |
 | `.\mvnw.cmd package -DskipTests`  | `./mvnw package -DskipTests`   | Genera el `.jar` en `target/`             |
 
 Al arrancar, Flyway crea las tablas y carga los datos iniciales si todavía no existen.
+
+## Pruebas
+
+Son **536 pruebas** automáticas y ninguna necesita base de datos ni internet, así que se pueden correr en cualquier PC:
+
+| Tipo | Qué revisan | Ejemplo |
+| ---- | ----------- | ------- |
+| Reglas de negocio | Servicios, entidades, cotización, riesgo y planificación, con repositorios falsos (Mockito) | `QuotationFacadeTest`, `RiskEvaluatorTest` |
+| Controladores | Códigos HTTP, validaciones y forma del JSON de error (MockMvc) | `ProjectControllerTest` |
+| Seguridad | La cadena de seguridad real: rutas públicas, tokens vencidos o falsos y CORS | `SecurityRulesTest` |
+| Servicios externos | Brevo y el servicio de IA contra servidores falsos: no sale ningún correo ni llamada real | `BrevoEmailSenderTest`, `AiServiceAdapterTest` |
+
+**Cobertura:** las pruebas recorren el 91 % de las líneas y el 84 % de las ramas del código.
+Después de `mvnw test`, el informe está en `target/site/jacoco/index.html` (se abre con el navegador).
 
 ## Endpoints
 
