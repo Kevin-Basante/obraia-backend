@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.obraia.backend.config.OpenApiConfig;
 import com.obraia.backend.dto.ErrorResponse;
 import com.obraia.backend.dto.auth.MessageResponse;
+import com.obraia.backend.dto.auth.TokenRequest;
 import com.obraia.backend.dto.user.AccountDeletionImpactResponse;
 import com.obraia.backend.dto.user.ChangePasswordRequest;
 import com.obraia.backend.dto.user.DeleteAccountRequest;
@@ -78,5 +79,14 @@ public class AccountController {
     public MessageResponse requestDeletion(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody DeleteAccountRequest request, HttpServletRequest http) {
         return deletionService.requestDeletion(UUID.fromString(jwt.getSubject()), request, ClientInfo.from(http));
+    }
+
+    @PostMapping("/deletion/confirm")
+    @Operation(summary = "Confirm the deletion of the account with the token from the email link")
+    @ApiResponse(responseCode = "200", description = "Account deleted")
+    @ApiResponse(responseCode = "400", description = "Invalid, used or expired link",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public MessageResponse confirmDeletion(@Valid @RequestBody TokenRequest request, HttpServletRequest http) {
+        return deletionService.confirmDeletion(request.token(), ClientInfo.from(http));
     }
 }

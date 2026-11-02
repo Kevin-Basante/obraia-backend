@@ -49,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/catalogs/**").permitAll()
                         // The email link carries the proof, so the user may open it signed out.
                         .requestMatchers(HttpMethod.POST, "/api/projects/deletion/confirm").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/users/deletion/confirm").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
