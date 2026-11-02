@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.obraia.backend.config.AccountProperties;
+import com.obraia.backend.config.ClockConfig;
 import com.obraia.backend.dto.auth.MessageResponse;
 import com.obraia.backend.dto.user.AccountDeletionImpactResponse;
 import com.obraia.backend.dto.user.DeleteAccountRequest;
@@ -19,6 +20,7 @@ import com.obraia.backend.entity.User;
 import com.obraia.backend.entity.project.DeletionRequest;
 import com.obraia.backend.entity.project.Project;
 import com.obraia.backend.exception.FieldValidationException;
+import com.obraia.backend.exception.InvalidTokenException;
 import com.obraia.backend.exception.ResourceNotFoundException;
 import com.obraia.backend.repository.DeletionRequestRepository;
 import com.obraia.backend.repository.ProjectMemberRepository;
@@ -90,6 +92,32 @@ public class AccountDeletionService {
         emailService.sendDeletionConfirmation(user, token, properties.deletionLinkTtl(), properties.purgeAfter());
         auditService.record(AuditEvent.DELETION_REQUESTED, userId, user.getEmail(), client);
         return new MessageResponse("We sent you an email to confirm the deletion of your account");
+    }
+
+    /**
+     * Public route: the token from the email is enough. The account and the
+     * projects it created are hidden, the user leaves the projects of other
+     * people and every session is closed.
+     */
+    @Transactional
+    public MessageResponse confirmDeletion(String token, ClientInfo client) {
+        Instant now = Instant.now(clock);
+        DeletionRequest request = deletionRequestRepository.findByTokenHash(TokenHasher.hash(token))
+                .filter(found -> DeletionRequest.TARGET_ACCOUNT.equals(found.getTargetType()))
+                .filter(found -> found.isUsable(now))
+                .orElseThrow(InvalidTokenException::deletionLink);
+        User user = userRepository.findByIdAndDeletedAtIsNull(request.getTargetId())
+                .orElseThrow(InvalidTokenException::deletionLink);
+
+        request.markConfirmed(now);
+        user.markDeleted(now);
+        projectRepository.markDeletedByCreator(user.getId(), now);
+        memberRepository.deleteFromOthersProjects(user.getId());
+        refreshTokenService.revokeAll(user.getId());
+        auditService.record(AuditEvent.ACCOUNT_DELETED, user.getId(), user.getEmail(), client);
+        LocalDate purgeDate = LocalDate.ofInstant(now.plus(properties.purgeAfter()), ClockConfig.ZONE);
+        return new MessageResponse("Your account was deleted. Your data will be removed for good on "
+                + purgeDate + ".");
     }
 
     private User requireUser(UUID userId) {
