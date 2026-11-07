@@ -17,6 +17,7 @@ import com.obraia.backend.dto.phase.WorkPlanResponse;
 import com.obraia.backend.entity.phase.Phase;
 import com.obraia.backend.entity.phase.ProgressReport;
 import com.obraia.backend.entity.phase.Task;
+import com.obraia.backend.entity.phase.WorkStatus;
 import com.obraia.backend.repository.PhaseRepository;
 import com.obraia.backend.repository.ProgressReportRepository;
 import com.obraia.backend.repository.TaskRepository;
@@ -24,12 +25,14 @@ import com.obraia.backend.repository.TaskRepository;
 /**
  * Builds the responses of phases and tasks with their progress. The
  * progress of a task is its latest report (by report date, then by the
- * moment it was saved).
+ * moment it was saved). A completed task always counts as 100%, even when
+ * it was completed with its status button and nobody reported it.
  */
 @Component
 class WorkPlanViews {
 
     private static final BigDecimal NO_PROGRESS = BigDecimal.ZERO.setScale(2);
+    private static final BigDecimal COMPLETE = new BigDecimal("100.00");
 
     private final PhaseRepository phaseRepository;
     private final TaskRepository taskRepository;
@@ -76,8 +79,9 @@ class WorkPlanViews {
     }
 
     private TaskResponse task(Task task, Reports reports) {
-        return TaskResponse.from(task, today(), reports.latest().getOrDefault(task.getId(), NO_PROGRESS),
-                reports.counts().getOrDefault(task.getId(), 0));
+        BigDecimal progress = task.getSchedule().getStatus() == WorkStatus.COMPLETED ? COMPLETE
+                : reports.latest().getOrDefault(task.getId(), NO_PROGRESS);
+        return TaskResponse.from(task, today(), progress, reports.counts().getOrDefault(task.getId(), 0));
     }
 
     private Reports reports(UUID projectId) {
