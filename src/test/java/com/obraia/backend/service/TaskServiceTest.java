@@ -19,6 +19,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.obraia.backend.dto.phase.TaskRequest;
 import com.obraia.backend.dto.phase.TaskResponse;
@@ -59,7 +60,7 @@ class TaskServiceTest {
         when(tasks.save(any())).thenAnswer(call -> call.getArgument(0));
         reports = mock(ProgressReportRepository.class);
         WorkPlanViews views = new WorkPlanViews(phases, tasks, reports, CLOCK);
-        service = new TaskService(tasks, phases, access, views, CLOCK);
+        service = new TaskService(tasks, phases, access, views, CLOCK, mock(ApplicationEventPublisher.class));
     }
 
     @Test

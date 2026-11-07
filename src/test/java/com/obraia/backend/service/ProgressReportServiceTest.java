@@ -73,7 +73,7 @@ class ProgressReportServiceTest {
         when(reports.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
         when(users.getReferenceById(userId)).thenReturn(TestUsers.verifiedUser("hash"));
         WorkPlanViews views = new WorkPlanViews(phases, tasks, reports, CLOCK);
-        TaskService taskService = new TaskService(tasks, phases, access, views, CLOCK);
+        TaskService taskService = new TaskService(tasks, phases, access, views, CLOCK, mock(ApplicationEventPublisher.class));
         service = new ProgressReportService(reports, users, taskService, access, views, mock(EntityManager.class),
                 events);
     }

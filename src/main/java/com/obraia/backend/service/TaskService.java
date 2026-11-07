@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +15,7 @@ import com.obraia.backend.entity.phase.Task;
 import com.obraia.backend.entity.phase.WorkSchedule;
 import com.obraia.backend.entity.phase.WorkStatus;
 import com.obraia.backend.entity.project.Project;
+import com.obraia.backend.event.ProgressReportedEvent;
 import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.exception.FieldValidationException;
 import com.obraia.backend.exception.ResourceNotFoundException;
@@ -29,14 +31,16 @@ public class TaskService {
     private final ProjectAccessService accessService;
     private final WorkPlanViews views;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
     public TaskService(TaskRepository taskRepository, PhaseRepository phaseRepository,
-            ProjectAccessService accessService, WorkPlanViews views, Clock clock) {
+            ProjectAccessService accessService, WorkPlanViews views, Clock clock, ApplicationEventPublisher events) {
         this.taskRepository = taskRepository;
         this.phaseRepository = phaseRepository;
         this.accessService = accessService;
         this.views = views;
         this.clock = clock;
+        this.events = events;
     }
 
     @Transactional
@@ -97,6 +101,8 @@ public class TaskService {
         taskRepository.flush();
         syncPhase(task.getPhase());
         taskRepository.flush();
+        // Completing or reopening a task changes the progress, so the risk is assessed again.
+        events.publishEvent(new ProgressReportedEvent(projectId));
         return views.task(task);
     }
 
