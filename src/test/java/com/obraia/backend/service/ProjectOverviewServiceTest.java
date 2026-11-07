@@ -41,6 +41,7 @@ import com.obraia.backend.repository.ExpenseRepository;
 import com.obraia.backend.repository.PhaseRepository;
 import com.obraia.backend.repository.ProgressReportRepository;
 import com.obraia.backend.repository.ProjectMemberRepository;
+import com.obraia.backend.repository.ProjectRepository;
 import com.obraia.backend.repository.RiskAssessmentRepository;
 import com.obraia.backend.repository.TaskRepository;
 import com.obraia.backend.support.BlueprintFixtures;
@@ -105,7 +106,7 @@ class ProjectOverviewServiceTest {
                 ProjectFixtures.member(house, TestUsers.verifiedUser("hash"))));
 
         WorkPlanViews views = new WorkPlanViews(phases, tasks, reports, CLOCK);
-        service = new ProjectOverviewService(access, views, budgets, expenses, risks, blueprints,
+        service = new ProjectOverviewService(access, mock(ProjectRepository.class), views, budgets, expenses, risks, blueprints,
                 measurements, members);
     }
 
