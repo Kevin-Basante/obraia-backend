@@ -19,9 +19,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.obraia.backend.dto.overview.MoneyOverview;
+import com.obraia.backend.dto.overview.PortfolioResponse;
+import com.obraia.backend.dto.overview.ProjectCard;
 import com.obraia.backend.dto.overview.ProjectOverviewResponse;
 import com.obraia.backend.entity.blueprint.BlueprintMeasurement;
 import com.obraia.backend.entity.blueprint.MeasurementSource;
+import com.obraia.backend.entity.budget.BudgetStatus;
 import com.obraia.backend.entity.catalog.ElementType;
 import com.obraia.backend.entity.expense.ExpenseCategory;
 import com.obraia.backend.entity.phase.Phase;
@@ -58,11 +61,13 @@ class ProjectOverviewServiceTest {
 
     private final UUID userId = UUID.randomUUID();
     private final Project house = ProjectFixtures.project(userId, "Casa Resumen", ProjectStatus.IN_PROGRESS);
+    private final Project shop = ProjectFixtures.project(userId, "Local Resumen");
     private final Phase foundation = PhaseFixtures.phase(house, 1, "Cimentación");
     private final Task digging = PhaseFixtures.task(foundation, "Excavación");
     private final Task footings = PhaseFixtures.task(foundation, "Zapatas");
 
     private ProjectAccessService access;
+    private ProjectRepository projects;
     private BudgetRepository budgets;
     private ExpenseRepository expenses;
     private RiskAssessmentRepository risks;
@@ -71,6 +76,7 @@ class ProjectOverviewServiceTest {
     @BeforeEach
     void setUp() {
         access = mock(ProjectAccessService.class);
+        projects = mock(ProjectRepository.class);
         PhaseRepository phases = mock(PhaseRepository.class);
         TaskRepository tasks = mock(TaskRepository.class);
         ProgressReportRepository reports = mock(ProgressReportRepository.class);
@@ -91,7 +97,10 @@ class ProjectOverviewServiceTest {
                 List.of(PhaseFixtures.report(footings, "50.00", TODAY.minusDays(1))));
         when(budgets.findByProjectIdOrderByVersionDesc(house.getId())).thenReturn(List.of(
                 BudgetFixtures.budget(house, 2, "1200000.00"), BudgetFixtures.approved(house, 1, "1000000.00")));
+        when(budgets.findByProjectIdAndStatus(house.getId(), BudgetStatus.APPROVED))
+                .thenReturn(Optional.of(BudgetFixtures.approved(house, 1, "1000000.00")));
         when(expenses.sumByProjectId(house.getId())).thenReturn(new BigDecimal("800000.00"));
+        when(expenses.sumByProjectId(shop.getId())).thenReturn(BigDecimal.ZERO);
         when(expenses.totalsByCategory(house.getId())).thenReturn(List.of(
                 new ExpenseCategoryTotal(ExpenseCategory.LABOR, new BigDecimal("300000.00"), 1L),
                 new ExpenseCategoryTotal(ExpenseCategory.MATERIALS, new BigDecimal("500000.00"), 2L)));
@@ -104,9 +113,10 @@ class ProjectOverviewServiceTest {
                 wall(MeasurementSource.OCR, "16")));
         when(members.findByProjectIdOrderByJoinedAtAsc(house.getId())).thenReturn(List.of(
                 ProjectFixtures.member(house, TestUsers.verifiedUser("hash"))));
+        when(projects.findVisibleTo(userId)).thenReturn(List.of(shop, house));
 
         WorkPlanViews views = new WorkPlanViews(phases, tasks, reports, CLOCK);
-        service = new ProjectOverviewService(access, mock(ProjectRepository.class), views, budgets, expenses, risks, blueprints,
+        service = new ProjectOverviewService(access, projects, views, budgets, expenses, risks, blueprints,
                 measurements, members);
     }
 
@@ -170,6 +180,44 @@ class ProjectOverviewServiceTest {
                 .thenThrow(new ResourceNotFoundException("PROJECT_NOT_FOUND", "The project does not exist"));
 
         assertThrows(ResourceNotFoundException.class, () -> service.overview(house.getId(), stranger));
+    }
+
+    @Test
+    void portfolioAddsUpEveryProject() {
+        PortfolioResponse portfolio = service.portfolio(userId);
+
+        assertEquals(2, portfolio.projectCount());
+        assertEquals(1, portfolio.active());
+        assertEquals(1, portfolio.atRisk());
+        assertEquals(new BigDecimal("1000000.00"), portfolio.approvedBudget());
+        assertEquals(new BigDecimal("800000.00"), portfolio.totalSpent());
+        assertEquals(List.of("Local Resumen", "Casa Resumen"),
+                portfolio.projects().stream().map(card -> card.project().name()).toList());
+    }
+
+    @Test
+    void projectCardShowsProgressMoneyAndRisk() {
+        ProjectCard house = service.portfolio(userId).projects().get(1);
+        ProjectCard shop = service.portfolio(userId).projects().get(0);
+
+        assertEquals(new BigDecimal("75.00"), house.progressPct());
+        assertEquals(new BigDecimal("80.00"), house.spentPct());
+        assertEquals("high", house.risk().level().code());
+        assertEquals(new BigDecimal("0.00"), shop.progressPct());
+        assertNull(shop.approvedBudget());
+        assertNull(shop.spentPct());
+        assertNull(shop.risk());
+    }
+
+    @Test
+    void portfolioWithoutProjectsIsEmpty() {
+        when(projects.findVisibleTo(userId)).thenReturn(List.of());
+
+        PortfolioResponse portfolio = service.portfolio(userId);
+
+        assertEquals(0, portfolio.projectCount());
+        assertEquals(BigDecimal.ZERO, portfolio.approvedBudget());
+        assertEquals(BigDecimal.ZERO, portfolio.totalSpent());
     }
 
     private BlueprintMeasurement wall(MeasurementSource source, String lengthM) {
