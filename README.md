@@ -433,6 +433,17 @@ BlueprintAnalysisService / QuotationFacade  →  AiServiceProxy  →  AiServiceA
 - El riesgo se evalúa solo después de cada gasto (`expense`), de cada reporte de avance y de cada tarea completada o reabierta con su botón (`progress_report`), y también cuando un miembro lo pide (`manual`). Las obras completadas o canceladas no se evalúan solas. Cada evaluación se guarda, así que la respuesta trae la última y la historia (las últimas 20, de la más vieja a la más nueva) para dibujar la gráfica.
 - La versión del modelo es `rules-v1` (reglas fijas, sin IA).
 
+## Cómo funciona el dashboard
+
+- El servicio `ProjectOverviewService` junta en una sola respuesta lo que dicen el plan, los presupuestos, los gastos, el riesgo y las medidas, para que la pantalla no tenga que pedir cada parte por separado.
+- **Dashboard de una obra** (`/api/dashboard/projects/{id}`):
+  - `work`: avance de la obra, fechas del plan, fases y tareas completadas, tareas atrasadas, la fase actual (la primera que está en curso o, si ninguna lo está, la primera pendiente), el avance de cada fase y las próximas 5 tareas sin completar (primero las atrasadas, luego por fecha de inicio).
+  - `money`: versión aprobada, cuántas versiones se cotizaron, presupuesto aprobado, total gastado, lo que queda, el % gastado y el total de cada categoría de gasto. Sin presupuesto aprobado, la comparación llega en `null`.
+  - `risk`: nivel, puntaje y días de atraso esperados de la última evaluación (`null` antes de la primera).
+  - `counts`: planos, medidas a mano, medidas de la IA y miembros.
+- **Dashboard de todas las obras** (`/api/dashboard`): una tarjeta por obra (la más nueva primero) con su avance, presupuesto aprobado, gastado, % gastado y riesgo, y arriba los totales: cuántas obras hay, cuántas están en curso, cuántas tienen riesgo alto o crítico, la suma de los presupuestos aprobados y la de los gastos.
+- Solo se ven las obras de las que el usuario es miembro; la obra de otra persona responde 404.
+
 ## Cómo funcionan las notificaciones
 
 - **Patrón Observer:** los servicios publican eventos de Spring y no saben quién los escucha. `ProjectNotifications` los escucha con `@TransactionalEventListener`, después de que el cambio queda guardado, y avisa a todos los miembros de la obra:
