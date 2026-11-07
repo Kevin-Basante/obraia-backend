@@ -423,7 +423,7 @@ BlueprintAnalysisService / QuotationFacade  →  AiServiceProxy  →  AiServiceA
 - **Puntaje final:** la mitad es el promedio ponderado de las cuatro reglas y la otra mitad es la regla más alta, para que un solo problema grave no quede escondido. El nivel sale del puntaje: `low` (menos de 25), `medium` (25 a 49,99), `high` (50 a 74,99) y `critical` (75 o más).
 - **Días de atraso esperados:** el mayor entre los días de atraso de la tarea más atrasada y los días que faltan para alcanzar el ritmo planeado.
 - Cada regla devuelve su puntaje, su peso, sus días de atraso y una frase que explica el resultado (`detail`), por ejemplo `105% of the approved budget is spent`. Se guardan como JSON en la columna `risk_factors`.
-- El riesgo se evalúa solo después de cada gasto (`expense`) y de cada reporte de avance (`progress_report`), y también cuando un miembro lo pide (`manual`). Las obras completadas o canceladas no se evalúan solas. Cada evaluación se guarda, así que la respuesta trae la última y la historia (las últimas 20, de la más vieja a la más nueva) para dibujar la gráfica.
+- El riesgo se evalúa solo después de cada gasto (`expense`), de cada reporte de avance y de cada tarea completada o reabierta con su botón (`progress_report`), y también cuando un miembro lo pide (`manual`). Las obras completadas o canceladas no se evalúan solas. Cada evaluación se guarda, así que la respuesta trae la última y la historia (las últimas 20, de la más vieja a la más nueva) para dibujar la gráfica.
 - La versión del modelo es `rules-v1` (reglas fijas, sin IA).
 
 ## Cómo funcionan las notificaciones
@@ -466,7 +466,7 @@ Además, los catálogos responden con `Cache-Control: max-age=600` para que el n
 | Bridge          | `BlueprintStorage` con almacenamiento en base de datos o en carpeta  |
 | Template Method | `StandardPhasePlanner`: el algoritmo del plan es fijo y cada tipo de obra pone sus tareas y fases extra |
 | Strategy        | `RiskStrategy`: cuatro reglas de riesgo que `RiskEvaluator` combina; también `EmailSender` (consola o Brevo según `MAIL_PROVIDER`) |
-| Observer        | Eventos de Spring: `RiskTriggers` evalúa el riesgo tras gastos y avances, `ProjectNotifications` avisa a los miembros y `BudgetVersions` borra la caché |
+| Observer        | Eventos de Spring: `RiskTriggers` evalúa el riesgo tras gastos, avances y tareas completadas, `ProjectNotifications` avisa a los miembros y `BudgetVersions` borra la caché |
 | Repository, DTO y capas | Repositorios de Spring Data, objetos de `dto/` y controladores → servicios → repositorios |
 
 ## Estructura
