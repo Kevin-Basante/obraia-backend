@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -44,6 +45,7 @@ class TaskServiceTest {
     private final Phase masonry = PhaseFixtures.phase(project, 2, "Mampostería");
 
     private TaskRepository tasks;
+    private ProgressReportRepository reports;
     private TaskService service;
 
     @BeforeEach
@@ -55,7 +57,8 @@ class TaskServiceTest {
         when(phases.findByIdAndProjectId(foundation.getId(), project.getId())).thenReturn(Optional.of(foundation));
         when(phases.findByIdAndProjectId(masonry.getId(), project.getId())).thenReturn(Optional.of(masonry));
         when(tasks.save(any())).thenAnswer(call -> call.getArgument(0));
-        WorkPlanViews views = new WorkPlanViews(phases, tasks, mock(ProgressReportRepository.class), CLOCK);
+        reports = mock(ProgressReportRepository.class);
+        WorkPlanViews views = new WorkPlanViews(phases, tasks, reports, CLOCK);
         service = new TaskService(tasks, phases, access, views, CLOCK);
     }
 
@@ -120,6 +123,34 @@ class TaskServiceTest {
 
         assertEquals(LocalDate.of(2026, 11, 10), response.actualEndDate());
         assertEquals(WorkStatus.COMPLETED, foundation.getSchedule().getStatus());
+    }
+
+    @Test
+    void completedTaskCountsAsFullProgressWithoutAReport() {
+        Task task = PhaseFixtures.task(foundation, "Solado");
+        task.getSchedule().changeStatus(WorkStatus.IN_PROGRESS, LocalDate.of(2026, 11, 9));
+        when(tasks.findByIdAndPhaseProjectId(task.getId(), project.getId())).thenReturn(Optional.of(task));
+        when(tasks.findByPhaseId(foundation.getId())).thenReturn(List.of(task));
+
+        TaskResponse response = service.changeStatus(project.getId(), userId, task.getId(), "completed");
+
+        assertEquals(new BigDecimal("100.00"), response.progressPct());
+        assertEquals(0, response.reportCount());
+    }
+
+    @Test
+    void reopenedTaskGoesBackToItsLatestReport() {
+        Task task = PhaseFixtures.task(foundation, "Solado");
+        task.getSchedule().changeStatus(WorkStatus.IN_PROGRESS, LocalDate.of(2026, 11, 2));
+        task.getSchedule().changeStatus(WorkStatus.COMPLETED, LocalDate.of(2026, 11, 9));
+        when(tasks.findByIdAndPhaseProjectId(task.getId(), project.getId())).thenReturn(Optional.of(task));
+        when(tasks.findByPhaseId(foundation.getId())).thenReturn(List.of(task));
+        when(reports.findByTaskPhaseProjectIdOrderByReportDateDescCreatedAtDesc(project.getId()))
+                .thenReturn(List.of(PhaseFixtures.report(task, "40.00", LocalDate.of(2026, 11, 5))));
+
+        TaskResponse response = service.changeStatus(project.getId(), userId, task.getId(), "in_progress");
+
+        assertEquals(new BigDecimal("40.00"), response.progressPct());
     }
 
     @Test
