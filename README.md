@@ -375,7 +375,7 @@ BlueprintAnalysisService / QuotationFacade  →  AiServiceProxy  →  AiServiceA
 - Las fechas se calculan en días hábiles de lunes a sábado desde la fecha de inicio planeada de la obra; si la obra no tiene fecha, las fases quedan sin fechas. Cada fase empieza el día hábil siguiente al fin de la anterior.
 - Estados de fases y tareas: `planned` → `in_progress` → `delayed` o `completed`. Una tarea o fase completada se puede reabrir (`in_progress`). Una fase o tarea está atrasada (`late`) si pasó su fecha de fin planeada y no está completada.
 - Reportar avance mueve la tarea: más de 0 % la inicia y 100 % la completa. La fase empieza con su primera tarea y se completa sola cuando todas sus tareas están completas. Una fase no se puede completar a mano si le faltan tareas.
-- El avance de una tarea es su último reporte (por fecha del reporte). El avance de una fase es el promedio de sus tareas y el de la obra es el promedio de todas las tareas.
+- El avance de una tarea es su último reporte (por fecha del reporte). Una tarea completada cuenta siempre como 100 %, aunque se haya completado con su botón y nadie la haya reportado; si se reabre, vuelve a su último reporte. El avance de una fase es el promedio de sus tareas y el de la obra es el promedio de todas las tareas.
 - El reporte puede indicar que lo dio el maestro de obra asignado (`fromSiteManager: true`); si la obra no tiene maestro asignado, la respuesta es 400. La fecha del reporte no puede ser futura y, si no se envía, es hoy (hora de Colombia).
 - El plan solo se puede crear una vez (409 `PHASES_ALREADY_CREATED`) y solo se puede borrar mientras no tenga reportes (409 `PHASES_HAVE_PROGRESS`).
 
