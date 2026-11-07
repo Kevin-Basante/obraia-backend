@@ -245,6 +245,13 @@ Después de `mvnw test`, el informe está en `target/site/jacoco/index.html` (se
 | GET    | `/api/projects/{id}/risk`                          | Última evaluación de riesgo y la historia del puntaje         |
 | POST   | `/api/projects/{id}/risk/assess`                   | Evaluar el riesgo en este momento                             |
 
+### Dashboard (requieren token)
+
+| Método | Ruta                                               | Qué hace                                                      |
+| ------ | -------------------------------------------------- | ------------------------------------------------------------- |
+| GET    | `/api/dashboard`                                   | Todas mis obras con su avance, dinero y riesgo, y los totales |
+| GET    | `/api/dashboard/projects/{id}`                     | Resumen de una obra: plan, próximas tareas, dinero, riesgo y conteos |
+
 ### Notificaciones (requieren token)
 
 | Método | Ruta                                     | Qué hace                                         |
