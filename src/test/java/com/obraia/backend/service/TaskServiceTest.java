@@ -27,6 +27,7 @@ import com.obraia.backend.entity.phase.Phase;
 import com.obraia.backend.entity.phase.Task;
 import com.obraia.backend.entity.phase.WorkStatus;
 import com.obraia.backend.entity.project.Project;
+import com.obraia.backend.event.ProgressReportedEvent;
 import com.obraia.backend.exception.ConflictException;
 import com.obraia.backend.exception.FieldValidationException;
 import com.obraia.backend.repository.PhaseRepository;
@@ -47,6 +48,7 @@ class TaskServiceTest {
 
     private TaskRepository tasks;
     private ProgressReportRepository reports;
+    private ApplicationEventPublisher events;
     private TaskService service;
 
     @BeforeEach
@@ -60,7 +62,8 @@ class TaskServiceTest {
         when(tasks.save(any())).thenAnswer(call -> call.getArgument(0));
         reports = mock(ProgressReportRepository.class);
         WorkPlanViews views = new WorkPlanViews(phases, tasks, reports, CLOCK);
-        service = new TaskService(tasks, phases, access, views, CLOCK, mock(ApplicationEventPublisher.class));
+        events = mock(ApplicationEventPublisher.class);
+        service = new TaskService(tasks, phases, access, views, CLOCK, events);
     }
 
     @Test
@@ -152,6 +155,29 @@ class TaskServiceTest {
         TaskResponse response = service.changeStatus(project.getId(), userId, task.getId(), "in_progress");
 
         assertEquals(new BigDecimal("40.00"), response.progressPct());
+    }
+
+    @Test
+    void statusChangeAsksForANewRiskAssessment() {
+        Task task = PhaseFixtures.task(foundation, "Solado");
+        task.getSchedule().changeStatus(WorkStatus.IN_PROGRESS, LocalDate.of(2026, 11, 9));
+        when(tasks.findByIdAndPhaseProjectId(task.getId(), project.getId())).thenReturn(Optional.of(task));
+        when(tasks.findByPhaseId(foundation.getId())).thenReturn(List.of(task));
+
+        service.changeStatus(project.getId(), userId, task.getId(), "completed");
+
+        verify(events).publishEvent(new ProgressReportedEvent(project.getId()));
+    }
+
+    @Test
+    void refusedStatusChangePublishesNothing() {
+        Task task = PhaseFixtures.task(foundation, "Solado");
+        when(tasks.findByIdAndPhaseProjectId(task.getId(), project.getId())).thenReturn(Optional.of(task));
+
+        assertThrows(ConflictException.class,
+                () -> service.changeStatus(project.getId(), userId, task.getId(), "completed"));
+
+        verify(events, never()).publishEvent(any(Object.class));
     }
 
     @Test
