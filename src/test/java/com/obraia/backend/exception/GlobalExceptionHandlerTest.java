@@ -43,6 +43,11 @@ class GlobalExceptionHandlerTest {
             throw new StoredFileNotFoundException("projects/a/plan.pdf");
         }
 
+        @GetMapping("/closed")
+        String closed() {
+            throw new ConflictException("PROJECT_CLOSED", "The project is closed");
+        }
+
         @GetMapping("/boom")
         String boom() {
             throw new IllegalStateException("database password is wrong");
@@ -92,6 +97,14 @@ class GlobalExceptionHandlerTest {
         mvc.perform(get("/files"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("FILE_NOT_FOUND"));
+    }
+
+    @Test
+    void anErrorWithoutValuesHasNoParams() throws Exception {
+        mvc.perform(get("/closed"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("PROJECT_CLOSED"))
+                .andExpect(jsonPath("$.error.params").doesNotExist());
     }
 
     @Test
