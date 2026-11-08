@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +28,7 @@ class CostDecoratorTest {
         assertEquals(new BigDecimal("226000.00"), materials.amount());
         assertEquals(1, materials.lines().size());
         assertEquals("Materials for the measured elements (2 items)", materials.lines().get(0).description());
+        assertEquals(Map.of("items", "2"), materials.lines().get(0).params());
     }
 
     @Test
@@ -46,6 +48,7 @@ class CostDecoratorTest {
         assertEquals(new BigDecimal("7119.00"), transport.amount());
         assertEquals(new BigDecimal("3.00"), transport.percentage());
         assertEquals("Transport of the materials to the site in Cali", transport.description());
+        assertEquals(Map.of("city", "Cali"), transport.params());
     }
 
     @Test
@@ -55,6 +58,7 @@ class CostDecoratorTest {
         CostLine labor = cost.lines().get(1);
         assertEquals(new BigDecimal("2800000.00"), labor.amount());
         assertEquals("Crew for 10 working days at COP 280,000 a day", labor.description());
+        assertEquals(Map.of("days", "10", "rate", "280000"), labor.params());
     }
 
     @Test
