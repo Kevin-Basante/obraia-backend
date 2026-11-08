@@ -23,6 +23,11 @@ final class RiskScores {
 
     /** A percentage without decimals, for the sentences: 37.5 becomes "38%". */
     static String percent(BigDecimal value) {
-        return value.setScale(0, RoundingMode.HALF_UP).toPlainString() + "%";
+        return whole(value) + "%";
+    }
+
+    /** A number without decimals, for the params of the sentences: 37.5 becomes "38". */
+    static String whole(BigDecimal value) {
+        return value.setScale(0, RoundingMode.HALF_UP).toPlainString();
     }
 }
