@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -31,8 +32,11 @@ class BudgetOverrunStrategyTest {
 
     @Test
     void detailSaysTheShareSpent() {
-        assertEquals("105% of the approved budget is spent",
-                strategy.evaluate(spent(new BigDecimal("1000000"), "1050000")).detail());
+        RiskFactor factor = strategy.evaluate(spent(new BigDecimal("1000000"), "1050000"));
+
+        assertEquals("105% of the approved budget is spent", factor.detail());
+        assertEquals("budget_spent", factor.detailCode());
+        assertEquals(Map.of("spent", "105"), factor.detailParams());
     }
 
     @Test
@@ -41,5 +45,6 @@ class BudgetOverrunStrategyTest {
 
         assertEquals(new BigDecimal("0.00"), factor.score());
         assertEquals("There is no approved budget yet", factor.detail());
+        assertEquals("no_budget", factor.detailCode());
     }
 }
