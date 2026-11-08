@@ -13,6 +13,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -57,7 +58,8 @@ class NotificationServiceTest {
         when(members.findByProjectIdOrderByJoinedAtAsc(project.getId())).thenReturn(List.of(
                 ProjectFixtures.member(project, owner), ProjectFixtures.member(project, engineer)));
 
-        int sent = service.notifyMembers(project.getId(), NotificationType.DELAY_RISK, "The risk rose to high");
+        int sent = service.notifyMembers(project.getId(), NotificationType.DELAY_RISK, "The risk rose to high",
+                Map.of("level", "high"));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Notification>> saved = ArgumentCaptor.forClass(List.class);
@@ -70,13 +72,14 @@ class NotificationServiceTest {
         assertEquals(project, first.getProject());
         assertEquals(CLOCK.instant(), first.getCreatedAt());
         assertEquals(false, first.isRead());
+        assertEquals(Map.of("level", "high"), first.getParams());
     }
 
     @Test
     void aProjectWithoutMembersSendsNothing() {
         when(members.findByProjectIdOrderByJoinedAtAsc(project.getId())).thenReturn(List.of());
 
-        assertEquals(0, service.notifyMembers(project.getId(), NotificationType.SYSTEM, "Hello"));
+        assertEquals(0, service.notifyMembers(project.getId(), NotificationType.SYSTEM, "Hello", Map.of()));
         verify(notifications).saveAll(anyList());
     }
 
@@ -90,6 +93,7 @@ class NotificationServiceTest {
 
         assertEquals("budget_approved", list.get(0).type().code());
         assertEquals("Casa Avisos", list.get(0).projectName());
+        assertNull(list.get(0).params());
         assertNull(list.get(1).projectId());
     }
 

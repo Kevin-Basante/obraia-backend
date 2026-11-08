@@ -1,7 +1,10 @@
 package com.obraia.backend.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -25,7 +28,8 @@ import com.obraia.backend.risk.RiskFactor;
 /**
  * Observer: turns what happens in a project into notifications for its
  * members. It runs after the change is committed, in its own transaction, so
- * a failure here never undoes the change.
+ * a failure here never undoes the change. Each message keeps the values of
+ * its sentence, so the frontend can write it in the language of the user.
  */
 @Component
 public class ProjectNotifications {
@@ -46,16 +50,18 @@ public class ProjectNotifications {
 
     @TransactionalEventListener
     public void onBudgetApproved(BudgetApprovedEvent event) {
-        notify(event.projectId(), NotificationType.BUDGET_APPROVED, project -> "Version " + event.version()
-                + " of the budget of \"" + project.getName() + "\" was approved for "
-                + money(event.projectedAmount()) + ".");
+        notify(event.projectId(), NotificationType.BUDGET_APPROVED, project -> new Message("Version "
+                + event.version() + " of the budget of \"" + project.getName() + "\" was approved for "
+                + money(event.projectedAmount()) + ".", Map.of("project", project.getName(),
+                        "version", String.valueOf(event.version()), "amount", amount(event.projectedAmount()))));
     }
 
     @TransactionalEventListener
     public void onBudgetExceeded(BudgetExceededEvent event) {
-        notify(event.projectId(), NotificationType.BUDGET_DEVIATION, project -> "The expenses of \""
+        notify(event.projectId(), NotificationType.BUDGET_DEVIATION, project -> new Message("The expenses of \""
                 + project.getName() + "\" passed the approved budget: " + money(event.spent()) + " spent of "
-                + money(event.approvedBudget()) + ".");
+                + money(event.approvedBudget()) + ".", Map.of("project", project.getName(),
+                        "spent", amount(event.spent()), "budget", amount(event.approvedBudget()))));
     }
 
     /** Only when the risk reaches high or critical and is worse than before. */
@@ -69,22 +75,35 @@ public class ProjectNotifications {
             StringBuilder message = new StringBuilder("The risk of \"").append(project.getName())
                     .append("\" rose to ").append(event.level().getCode())
                     .append(" (").append(event.score().toPlainString()).append(" of 100)");
+            Map<String, String> params = new LinkedHashMap<>();
+            params.put("project", project.getName());
+            params.put("level", event.level().getCode());
+            params.put("score", event.score().toPlainString());
+            params.put("delayDays", String.valueOf(event.predictedDelayDays()));
             RiskFactor reason = event.mainFactor();
             if (reason != null) {
                 message.append(": ").append(reason.detail());
+                if (reason.detailCode() != null) {
+                    // The values of the reason go with a prefix: "reason.spent".
+                    params.put("reason", reason.detailCode());
+                    reason.detailParams().forEach((key, value) -> params.put("reason." + key, value));
+                }
             }
             message.append('.');
             if (event.predictedDelayDays() > 0) {
                 message.append(" About ").append(event.predictedDelayDays()).append(" days of delay are expected.");
             }
-            return message.toString();
+            return new Message(message.toString(), params);
         });
     }
 
-    private void notify(UUID projectId, NotificationType type, Function<Project, String> message) {
+    private void notify(UUID projectId, NotificationType type, Function<Project, Message> message) {
         try {
             newTransaction.executeWithoutResult(status -> projectRepository.findByIdAndDeletedAtIsNull(projectId)
-                    .ifPresent(project -> notificationService.notifyMembers(projectId, type, message.apply(project))));
+                    .ifPresent(project -> {
+                        Message built = message.apply(project);
+                        notificationService.notifyMembers(projectId, type, built.text(), built.params());
+                    }));
         } catch (RuntimeException ex) {
             log.error("Could not send the {} notification of the project {}", type.getCode(), projectId, ex);
         }
@@ -93,5 +112,14 @@ public class ProjectNotifications {
     /** Colombian pesos without cents: "COP 120,000,000". */
     static String money(BigDecimal amount) {
         return String.format(Locale.US, "COP %,.0f", amount);
+    }
+
+    /** The same amount for the params, a plain number without cents: "120000000". */
+    static String amount(BigDecimal amount) {
+        return amount.setScale(0, RoundingMode.HALF_UP).toPlainString();
+    }
+
+    /** The English text of a notification and the values of its sentence. */
+    private record Message(String text, Map<String, String> params) {
     }
 }

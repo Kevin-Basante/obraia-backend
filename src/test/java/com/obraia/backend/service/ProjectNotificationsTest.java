@@ -54,7 +54,8 @@ class ProjectNotificationsTest {
         notifications.onBudgetApproved(new BudgetApprovedEvent(project.getId(), 2, new BigDecimal("120000000.00")));
 
         verify(notificationService).notifyMembers(project.getId(), NotificationType.BUDGET_APPROVED,
-                "Version 2 of the budget of \"Casa Avisos\" was approved for COP 120,000,000.");
+                "Version 2 of the budget of \"Casa Avisos\" was approved for COP 120,000,000.",
+                Map.of("project", "Casa Avisos", "version", "2", "amount", "120000000"));
     }
 
     @Test
@@ -63,7 +64,8 @@ class ProjectNotificationsTest {
                 new BigDecimal("5200000")));
 
         verify(notificationService).notifyMembers(project.getId(), NotificationType.BUDGET_DEVIATION,
-                "The expenses of \"Casa Avisos\" passed the approved budget: COP 5,200,000 spent of COP 5,000,000.");
+                "The expenses of \"Casa Avisos\" passed the approved budget: COP 5,200,000 spent of COP 5,000,000.",
+                Map.of("project", "Casa Avisos", "spent", "5200000", "budget", "5000000"));
     }
 
     @Test
@@ -72,14 +74,16 @@ class ProjectNotificationsTest {
 
         verify(notificationService).notifyMembers(project.getId(), NotificationType.DELAY_RISK,
                 "The risk of \"Casa Avisos\" rose to high (66.88 of 100): 110% of the budget is spent with 40% of "
-                        + "the work done. About 12 days of delay are expected.");
+                        + "the work done. About 12 days of delay are expected.",
+                Map.of("project", "Casa Avisos", "level", "high", "score", "66.88", "delayDays", "12",
+                        "reason", "spending_vs_progress", "reason.spent", "110"));
     }
 
     @Test
     void theFirstAssessmentCountsAsARise() {
         notifications.onRiskAssessed(risk(null, RiskLevel.CRITICAL, 0));
 
-        verify(notificationService).notifyMembers(any(), any(), any());
+        verify(notificationService).notifyMembers(any(), any(), any(), any());
     }
 
     @Test
@@ -88,11 +92,22 @@ class ProjectNotificationsTest {
         notifications.onRiskAssessed(risk(RiskLevel.HIGH, RiskLevel.HIGH, 0));
         notifications.onRiskAssessed(risk(RiskLevel.CRITICAL, RiskLevel.HIGH, 0));
 
-        verify(notificationService, never()).notifyMembers(any(), any(), any());
+        verify(notificationService, never()).notifyMembers(any(), any(), any(), any());
+    }
+
+    @Test
+    void aRiskWithoutFactorsHasNoReason() {
+        notifications.onRiskAssessed(new RiskAssessedEvent(project.getId(), null, RiskLevel.HIGH,
+                new BigDecimal("70.00"), 0, null));
+
+        verify(notificationService).notifyMembers(project.getId(), NotificationType.DELAY_RISK,
+                "The risk of \"Casa Avisos\" rose to high (70.00 of 100).",
+                Map.of("project", "Casa Avisos", "level", "high", "score", "70.00", "delayDays", "0"));
     }
 
     @Test
     void moneyHasNoCents() {
         assertEquals("COP 1,234,568", ProjectNotifications.money(new BigDecimal("1234567.89")));
+        assertEquals("1234568", ProjectNotifications.amount(new BigDecimal("1234567.89")));
     }
 }

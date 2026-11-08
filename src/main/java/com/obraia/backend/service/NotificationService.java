@@ -2,6 +2,7 @@ package com.obraia.backend.service;
 
 import java.time.Clock;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -30,13 +31,13 @@ public class NotificationService {
         this.clock = clock;
     }
 
-    /** Sends the same message to every member of the project. */
+    /** Sends the same message, with the values of its sentence, to every member of the project. */
     @Transactional
-    public int notifyMembers(UUID projectId, NotificationType type, String message) {
+    public int notifyMembers(UUID projectId, NotificationType type, String message, Map<String, String> params) {
         List<Notification> notifications = memberRepository.findByProjectIdOrderByJoinedAtAsc(projectId).stream()
                 .filter(member -> member.getUser().getDeletedAt() == null)
                 .map(member -> new Notification(member.getUser().getId(), member.getProject(), type, message,
-                        clock.instant()))
+                        params, clock.instant()))
                 .toList();
         notificationRepository.saveAll(notifications);
         return notifications.size();
