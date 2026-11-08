@@ -27,6 +27,7 @@ import org.mockito.ArgumentCaptor;
 
 import com.obraia.backend.config.ClockConfig;
 import com.obraia.backend.config.ProjectProperties;
+import com.obraia.backend.dto.auth.MessageResponse;
 import com.obraia.backend.entity.User;
 import com.obraia.backend.entity.project.DeletionRequest;
 import com.obraia.backend.entity.project.Project;
@@ -93,7 +94,10 @@ class ProjectDeletionServiceTest {
 
     @Test
     void requestStoresOnlyTheHashAndEmailsTheToken() {
-        service.requestDeletion(project.getId(), creator.getId());
+        MessageResponse response = service.requestDeletion(project.getId(), creator.getId());
+
+        assertEquals("project_deletion_sent", response.code());
+        assertEquals(Map.of("project", "Casa Prueba"), response.params());
 
         ArgumentCaptor<String> token = ArgumentCaptor.forClass(String.class);
         verify(emails).sendDeletionConfirmation(eq(creator), eq("Casa Prueba"), token.capture(), any(), any());
@@ -110,10 +114,12 @@ class ProjectDeletionServiceTest {
         givenRequest(NOW.plusSeconds(60));
         when(projects.findByIdAndDeletedAtIsNull(project.getId())).thenReturn(Optional.of(project));
 
-        String message = service.confirmDeletion("token-123").message();
+        MessageResponse response = service.confirmDeletion("token-123");
 
         assertTrue(project.isDeleted());
-        assertTrue(message.contains("2026-12-02"));
+        assertTrue(response.message().contains("2026-12-02"));
+        assertEquals("project_deleted", response.code());
+        assertEquals(Map.of("project", "Casa Prueba", "purgeDate", "2026-12-02"), response.params());
     }
 
     @Test
