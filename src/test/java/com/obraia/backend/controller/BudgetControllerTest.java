@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
@@ -103,7 +104,7 @@ class BudgetControllerTest {
     private BudgetResponse budget(String code, String label) {
         return new BudgetResponse(budgetId, 1, new StatusResponse(code, label), new BigDecimal("7119.00"),
                 BigDecimal.ZERO, Instant.parse("2026-11-02T13:00:00Z"), null,
-                List.of(new BudgetItemResponse("transport", "Transport", "Transport of the materials to the site",
-                        new BigDecimal("7119.00"), new BigDecimal("3.00"))));
+                List.of(new BudgetItemResponse("transport", "Transport", "Transport of the materials to the site in Cali",
+                        Map.of("city", "Cali"), new BigDecimal("7119.00"), new BigDecimal("3.00"))));
     }
 }
