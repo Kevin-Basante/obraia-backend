@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +28,8 @@ class ProgressPaceStrategyTest {
         assertEquals(new BigDecimal("40.00"), factor.score());
         assertEquals(20, factor.delayDays());
         assertEquals("50% of the planned time passed with 30% of the work done", factor.detail());
+        assertEquals("time_vs_progress", factor.detailCode());
+        assertEquals(Map.of("elapsed", "50", "progress", "30"), factor.detailParams());
     }
 
     @Test
@@ -42,6 +45,9 @@ class ProgressPaceStrategyTest {
         ProjectSnapshot snapshot = new ProjectSnapshot(START, null, null, BigDecimal.ZERO, List.of(), null,
                 BigDecimal.ZERO);
 
-        assertEquals("The plan has no dates yet", strategy.evaluate(snapshot).detail());
+        RiskFactor factor = strategy.evaluate(snapshot);
+
+        assertEquals("The plan has no dates yet", factor.detail());
+        assertEquals("no_dates", factor.detailCode());
     }
 }
