@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.obraia.backend.config.AccountProperties;
 import com.obraia.backend.config.ClockConfig;
+import com.obraia.backend.dto.auth.MessageResponse;
 import com.obraia.backend.dto.user.DeleteAccountRequest;
 import com.obraia.backend.entity.AuditEvent;
 import com.obraia.backend.entity.User;
@@ -126,7 +128,7 @@ class AccountDeletionServiceTest {
     void confirmingHidesTheAccountAndItsProjects() {
         givenRequest(DeletionRequest.TARGET_ACCOUNT, NOW.plusSeconds(60));
 
-        String message = service.confirmDeletion("token-123", client).message();
+        MessageResponse response = service.confirmDeletion("token-123", client);
 
         assertNotNull(user.getDeletedAt());
         assertFalse(user.canSignIn());
@@ -134,7 +136,9 @@ class AccountDeletionServiceTest {
         verify(members).deleteFromOthersProjects(user.getId());
         verify(refreshTokens).revokeAll(user.getId());
         verify(audit).record(AuditEvent.ACCOUNT_DELETED, user.getId(), "ana@example.com", client);
-        assertTrue(message.contains("2026-12-02"));
+        assertTrue(response.message().contains("2026-12-02"));
+        assertEquals("account_deleted", response.code());
+        assertEquals(Map.of("purgeDate", "2026-12-02"), response.params());
     }
 
     @Test
