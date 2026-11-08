@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,6 +23,7 @@ import com.obraia.backend.event.BudgetApprovedEvent;
 import com.obraia.backend.event.BudgetExceededEvent;
 import com.obraia.backend.event.RiskAssessedEvent;
 import com.obraia.backend.repository.ProjectRepository;
+import com.obraia.backend.risk.RiskFactor;
 import com.obraia.backend.support.ProjectFixtures;
 
 class ProjectNotificationsTest {
@@ -41,8 +43,10 @@ class ProjectNotificationsTest {
     }
 
     private RiskAssessedEvent risk(RiskLevel previous, RiskLevel level, int delayDays) {
-        return new RiskAssessedEvent(project.getId(), previous, level, new BigDecimal("66.88"), delayDays,
-                "110% of the budget is spent with 40% of the work done");
+        RiskFactor reason = new RiskFactor("spending_pace", "Spending against progress", new BigDecimal("100.00"),
+                new BigDecimal("0.15"), 0, "110% of the budget is spent with 40% of the work done",
+                "spending_vs_progress", Map.of("spent", "110"));
+        return new RiskAssessedEvent(project.getId(), previous, level, new BigDecimal("66.88"), delayDays, reason);
     }
 
     @Test

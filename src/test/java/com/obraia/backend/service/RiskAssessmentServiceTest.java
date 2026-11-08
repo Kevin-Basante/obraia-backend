@@ -95,8 +95,13 @@ class RiskAssessmentServiceTest {
 
         service.assess(project.getId(), userId);
 
-        verify(events).publishEvent(new RiskAssessedEvent(project.getId(), RiskLevel.LOW, RiskLevel.HIGH,
-                new BigDecimal("66.88"), 0, "110% of the budget is spent with 40% of the work done"));
+        ArgumentCaptor<RiskAssessedEvent> event = ArgumentCaptor.forClass(RiskAssessedEvent.class);
+        verify(events).publishEvent(event.capture());
+        assertEquals(RiskLevel.LOW, event.getValue().previousLevel());
+        assertEquals(RiskLevel.HIGH, event.getValue().level());
+        assertEquals(new BigDecimal("66.88"), event.getValue().score());
+        assertEquals("110% of the budget is spent with 40% of the work done", event.getValue().mainFactor().detail());
+        assertEquals("spending_vs_progress", event.getValue().mainFactor().detailCode());
     }
 
     @Test

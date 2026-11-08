@@ -90,12 +90,11 @@ public class RiskAssessmentService {
         RiskAssessment assessment = assessmentRepository.save(new RiskAssessment(project, result.level(),
                 result.score(), result.predictedDelayDays(), JSON.writeValueAsString(result.factors()),
                 RiskEvaluator.MODEL_VERSION, trigger, clock.instant()));
-        String mainReason = result.factors().stream()
+        RiskFactor mainFactor = result.factors().stream()
                 .max(Comparator.comparing(RiskFactor::score))
-                .map(RiskFactor::detail)
                 .orElse(null);
         events.publishEvent(new RiskAssessedEvent(projectId, previous, result.level(), result.score(),
-                result.predictedDelayDays(), mainReason));
+                result.predictedDelayDays(), mainFactor));
         return assessment;
     }
 

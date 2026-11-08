@@ -20,6 +20,7 @@ import com.obraia.backend.event.BudgetApprovedEvent;
 import com.obraia.backend.event.BudgetExceededEvent;
 import com.obraia.backend.event.RiskAssessedEvent;
 import com.obraia.backend.repository.ProjectRepository;
+import com.obraia.backend.risk.RiskFactor;
 
 /**
  * Observer: turns what happens in a project into notifications for its
@@ -68,8 +69,9 @@ public class ProjectNotifications {
             StringBuilder message = new StringBuilder("The risk of \"").append(project.getName())
                     .append("\" rose to ").append(event.level().getCode())
                     .append(" (").append(event.score().toPlainString()).append(" of 100)");
-            if (event.mainReason() != null) {
-                message.append(": ").append(event.mainReason());
+            RiskFactor reason = event.mainFactor();
+            if (reason != null) {
+                message.append(": ").append(reason.detail());
             }
             message.append('.');
             if (event.predictedDelayDays() > 0) {
