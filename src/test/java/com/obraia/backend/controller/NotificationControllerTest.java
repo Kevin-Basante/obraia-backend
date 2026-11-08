@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
@@ -57,7 +58,8 @@ class NotificationControllerTest {
 
     private static NotificationResponse notification(boolean read) {
         return new NotificationResponse(UUID.randomUUID(), new StatusResponse("delay_risk", "Risk of delay"),
-                "The risk of \"Casa Avisos\" rose to high", UUID.randomUUID(), "Casa Avisos", read,
+                "The risk of \"Casa Avisos\" rose to high",
+                Map.of("project", "Casa Avisos", "level", "high"), UUID.randomUUID(), "Casa Avisos", read,
                 Instant.parse("2026-11-20T15:00:00Z"));
     }
 
@@ -68,6 +70,7 @@ class NotificationControllerTest {
         mvc.perform(get("/api/notifications"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].type.code").value("delay_risk"))
+                .andExpect(jsonPath("$[0].params.level").value("high"))
                 .andExpect(jsonPath("$[0].read").value(false));
     }
 
