@@ -54,6 +54,7 @@ public class AccountService {
         refreshTokenService.revokeAll(userId);
         auditService.record(AuditEvent.PASSWORD_CHANGED, userId, user.getEmail(), client);
         emailService.sendPasswordChangedEmail(user);
-        return new MessageResponse("Your password was changed. Sign in again with the new password.");
+        return MessageResponse.of("password_changed",
+                "Your password was changed. Sign in again with the new password.", Map.of());
     }
 }
