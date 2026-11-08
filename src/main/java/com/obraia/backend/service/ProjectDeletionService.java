@@ -3,6 +3,7 @@ package com.obraia.backend.service;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -81,7 +82,9 @@ public class ProjectDeletionService {
         // If the email fails, the exception rolls back the request too.
         emailService.sendDeletionConfirmation(user, project.getName(), token, properties.deletionLinkTtl(),
                 properties.purgeAfter());
-        return new MessageResponse("We sent you an email to confirm the deletion of " + project.getName());
+        return MessageResponse.of("project_deletion_sent",
+                "We sent you an email to confirm the deletion of " + project.getName(),
+                Map.of("project", project.getName()));
     }
 
     /** Public route: the token from the email is enough, like the other email links. */
@@ -98,7 +101,8 @@ public class ProjectDeletionService {
         request.markConfirmed(now);
         project.markDeleted(now);
         LocalDate purgeDate = LocalDate.ofInstant(now.plus(properties.purgeAfter()), ClockConfig.ZONE);
-        return new MessageResponse("The project " + project.getName()
-                + " was deleted. Its data will be removed for good on " + purgeDate + ".");
+        return MessageResponse.of("project_deleted", "The project " + project.getName()
+                + " was deleted. Its data will be removed for good on " + purgeDate + ".",
+                Map.of("project", project.getName(), "purgeDate", purgeDate.toString()));
     }
 }
