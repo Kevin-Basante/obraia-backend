@@ -1,8 +1,10 @@
 package com.obraia.backend.quotation;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.util.Locale;
+import java.util.Map;
 
 import com.obraia.backend.entity.budget.BudgetItemType;
 
@@ -23,6 +25,8 @@ public class LaborCost extends CostDecorator {
         String rate = NumberFormat.getIntegerInstance(Locale.US).format(dailyRate);
         return new CostLine(BudgetItemType.LABOR,
                 "Crew for " + workingDays + " working days at COP " + rate + " a day",
-                Money.round(dailyRate.multiply(BigDecimal.valueOf(workingDays))), null);
+                Money.round(dailyRate.multiply(BigDecimal.valueOf(workingDays))), null,
+                Map.of("days", String.valueOf(workingDays), "rate", dailyRate.setScale(0, RoundingMode.HALF_EVEN)
+                        .toPlainString()));
     }
 }
