@@ -2,6 +2,7 @@ package com.obraia.backend.quotation;
 
 import java.math.BigDecimal;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 
 import com.obraia.backend.entity.budget.BudgetItemType;
@@ -23,6 +24,6 @@ public class TransportCost extends CostDecorator {
     @Override
     protected CostLine ownLine() {
         return new CostLine(BudgetItemType.TRANSPORT, "Transport of the materials to the site in " + city,
-                Money.percentOf(innerAmountOf(BASE), transportPct), transportPct);
+                Money.percentOf(innerAmountOf(BASE), transportPct), transportPct, Map.of("city", city));
     }
 }
