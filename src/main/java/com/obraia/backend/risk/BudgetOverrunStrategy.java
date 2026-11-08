@@ -1,6 +1,7 @@
 package com.obraia.backend.risk;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -23,9 +24,11 @@ public class BudgetOverrunStrategy implements RiskStrategy {
     public RiskFactor evaluate(ProjectSnapshot snapshot) {
         BigDecimal spentPct = snapshot.spentPct();
         if (spentPct == null) {
-            return new RiskFactor(CODE, LABEL, RiskScores.ZERO, WEIGHT, 0, "There is no approved budget yet");
+            return new RiskFactor(CODE, LABEL, RiskScores.ZERO, WEIGHT, 0, "There is no approved budget yet",
+                    "no_budget", Map.of());
         }
         String detail = RiskScores.percent(spentPct) + " of the approved budget is spent";
+        Map<String, String> params = Map.of("spent", RiskScores.whole(spentPct));
         BigDecimal score;
         if (spentPct.compareTo(WARNING_FROM) <= 0) {
             score = RiskScores.ZERO;
@@ -36,6 +39,6 @@ public class BudgetOverrunStrategy implements RiskStrategy {
             // 50 just over the budget, and 100 at 120%.
             score = new BigDecimal("50").add(spentPct.subtract(FULL).multiply(new BigDecimal("2.5")));
         }
-        return new RiskFactor(CODE, LABEL, RiskScores.clamp(score), WEIGHT, 0, detail);
+        return new RiskFactor(CODE, LABEL, RiskScores.clamp(score), WEIGHT, 0, detail, "budget_spent", params);
     }
 }
