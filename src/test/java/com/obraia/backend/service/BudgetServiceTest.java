@@ -2,6 +2,7 @@ package com.obraia.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
@@ -17,6 +18,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -110,6 +112,9 @@ class BudgetServiceTest {
         assertEquals(List.of(BudgetItemType.MATERIALS, BudgetItemType.WASTE),
                 rows.getAllValues().stream().map(BudgetItem::getItemType).toList());
         assertEquals(2, rows.getAllValues().get(1).getSequenceOrder());
+        // The materials row keeps how many materials it has; the waste row has no values.
+        assertEquals(Map.of("items", "1"), rows.getAllValues().get(0).getParams());
+        assertNull(rows.getAllValues().get(1).getParams());
         assertNotNull(response);
     }
 

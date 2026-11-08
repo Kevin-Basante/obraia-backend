@@ -93,8 +93,8 @@ public class BudgetService {
                 quotation.total(), clock.instant()));
         int order = 1;
         for (CostLine line : quotation.lines()) {
-            itemRepository.save(new BudgetItem(budget, line.type(), line.description(), line.amount(),
-                    line.percentage(), order++));
+            itemRepository.save(new BudgetItem(budget, line.type(), line.description(), line.params(),
+                    line.amount(), line.percentage(), order++));
         }
         replaceMaterials(project, quotation.getMaterials());
         budgetRepository.flush();
