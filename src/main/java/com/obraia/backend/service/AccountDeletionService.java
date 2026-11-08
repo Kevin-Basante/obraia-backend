@@ -91,7 +91,8 @@ public class AccountDeletionService {
         // If the email fails, the exception rolls back the request too.
         emailService.sendDeletionConfirmation(user, token, properties.deletionLinkTtl(), properties.purgeAfter());
         auditService.record(AuditEvent.DELETION_REQUESTED, userId, user.getEmail(), client);
-        return new MessageResponse("We sent you an email to confirm the deletion of your account");
+        return MessageResponse.of("account_deletion_sent",
+                "We sent you an email to confirm the deletion of your account", Map.of());
     }
 
     /**
@@ -116,8 +117,9 @@ public class AccountDeletionService {
         refreshTokenService.revokeAll(user.getId());
         auditService.record(AuditEvent.ACCOUNT_DELETED, user.getId(), user.getEmail(), client);
         LocalDate purgeDate = LocalDate.ofInstant(now.plus(properties.purgeAfter()), ClockConfig.ZONE);
-        return new MessageResponse("Your account was deleted. Your data will be removed for good on "
-                + purgeDate + ".");
+        return MessageResponse.of("account_deleted",
+                "Your account was deleted. Your data will be removed for good on " + purgeDate + ".",
+                Map.of("purgeDate", purgeDate.toString()));
     }
 
     private User requireUser(UUID userId) {
