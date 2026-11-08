@@ -1,6 +1,7 @@
 package com.obraia.backend.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -69,7 +70,8 @@ public class BlueprintService {
         }
         if (blueprintRepository.countByProjectId(projectId) >= properties.maxFilesPerProject()) {
             throw new ConflictException("BLUEPRINT_LIMIT_REACHED",
-                    "A project can have up to " + properties.maxFilesPerProject() + " blueprints");
+                    "A project can have up to " + properties.maxFilesPerProject() + " blueprints",
+                    Map.of("max", String.valueOf(properties.maxFilesPerProject())));
         }
         DetectedFile detected = FileTypeDetector.detect(content)
                 .orElseThrow(() -> new BadRequestException("UNSUPPORTED_FILE_TYPE",
