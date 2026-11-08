@@ -36,7 +36,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleAppException(AppException ex) {
         log.warn("{}: {}", ex.getCode(), ex.getMessage());
         return ResponseEntity.status(ex.getStatus())
-                .body(ErrorResponse.of(ex.getCode(), ex.getMessage()));
+                .body(ErrorResponse.withParams(ex.getCode(), ex.getMessage(), ex.getParams()));
     }
 
     @ExceptionHandler(FieldValidationException.class)
