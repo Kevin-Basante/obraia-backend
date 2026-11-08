@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -24,6 +25,7 @@ class ScheduleDelayStrategyTest {
         assertEquals("schedule_delay", factor.code());
         assertEquals(new BigDecimal("0.00"), factor.score());
         assertEquals(0, factor.delayDays());
+        assertEquals("no_late_tasks", factor.detailCode());
     }
 
     @Test
@@ -35,6 +37,8 @@ class ScheduleDelayStrategyTest {
         assertEquals(new BigDecimal("40.00"), factor.score());
         assertEquals(6, factor.delayDays());
         assertEquals("2 tasks are past their planned end; \"Vaciado de zapatas\" is 6 days late", factor.detail());
+        assertEquals("late_tasks", factor.detailCode());
+        assertEquals(Map.of("count", "2", "task", "Vaciado de zapatas", "days", "6"), factor.detailParams());
     }
 
     @Test
