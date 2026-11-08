@@ -2,6 +2,7 @@ package com.obraia.backend.risk;
 
 import java.math.BigDecimal;
 import java.util.Comparator;
+import java.util.Map;
 
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -21,7 +22,8 @@ public class ScheduleDelayStrategy implements RiskStrategy {
     @Override
     public RiskFactor evaluate(ProjectSnapshot snapshot) {
         if (snapshot.lateWork().isEmpty()) {
-            return new RiskFactor(CODE, LABEL, RiskScores.ZERO, WEIGHT, 0, "No task is past its planned end");
+            return new RiskFactor(CODE, LABEL, RiskScores.ZERO, WEIGHT, 0, "No task is past its planned end",
+                    "no_late_tasks", Map.of());
         }
         ProjectSnapshot.LateWork worst = snapshot.lateWork().stream()
                 .max(Comparator.comparingInt(ProjectSnapshot.LateWork::daysLate))
@@ -31,6 +33,8 @@ public class ScheduleDelayStrategy implements RiskStrategy {
         BigDecimal score = RiskScores.clamp(BigDecimal.valueOf(worst.daysLate() * 4L + count * 8L));
         String detail = (count == 1 ? "1 task is" : count + " tasks are") + " past their planned end; \""
                 + worst.name() + "\" is " + worst.daysLate() + (worst.daysLate() == 1 ? " day" : " days") + " late";
-        return new RiskFactor(CODE, LABEL, score, WEIGHT, worst.daysLate(), detail);
+        Map<String, String> params = Map.of("count", String.valueOf(count), "task", worst.name(),
+                "days", String.valueOf(worst.daysLate()));
+        return new RiskFactor(CODE, LABEL, score, WEIGHT, worst.daysLate(), detail, "late_tasks", params);
     }
 }
