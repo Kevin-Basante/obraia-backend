@@ -1,9 +1,13 @@
 package com.obraia.backend.entity.notification;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
+import org.hibernate.annotations.ColumnTransformer;
+
 import com.obraia.backend.entity.project.Project;
+import com.obraia.backend.util.TextParams;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -37,6 +41,11 @@ public class Notification {
     @Column(nullable = false, updatable = false, columnDefinition = "text")
     private String message;
 
+    /** Values of the message as JSON text; the column is jsonb, so the text is cast when it is written. */
+    @Column(updatable = false, columnDefinition = "jsonb")
+    @ColumnTransformer(write = "?::jsonb")
+    private String params;
+
     @Column(name = "is_read", nullable = false)
     private boolean read;
 
@@ -48,10 +57,16 @@ public class Notification {
     }
 
     public Notification(UUID userId, Project project, NotificationType type, String message, Instant createdAt) {
+        this(userId, project, type, message, Map.of(), createdAt);
+    }
+
+    public Notification(UUID userId, Project project, NotificationType type, String message,
+            Map<String, String> params, Instant createdAt) {
         this.userId = userId;
         this.project = project;
         this.type = type;
         this.message = message;
+        this.params = TextParams.toJson(params);
         this.createdAt = createdAt;
     }
 
@@ -77,6 +92,11 @@ public class Notification {
 
     public String getMessage() {
         return message;
+    }
+
+    /** The values of the message; null for the notifications made before they existed. */
+    public Map<String, String> getParams() {
+        return TextParams.fromJson(params);
     }
 
     public boolean isRead() {
