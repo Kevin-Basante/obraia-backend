@@ -2,6 +2,7 @@ package com.obraia.backend.quotation;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import com.obraia.backend.entity.budget.BudgetItemType;
 
@@ -22,6 +23,7 @@ public class MaterialsCost implements CostComponent {
     @Override
     public List<CostLine> lines() {
         return List.of(new CostLine(BudgetItemType.MATERIALS,
-                "Materials for the measured elements (" + needs.size() + " items)", amount(), null));
+                "Materials for the measured elements (" + needs.size() + " items)", amount(), null,
+                Map.of("items", String.valueOf(needs.size()))));
     }
 }
