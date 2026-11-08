@@ -429,7 +429,7 @@ BlueprintAnalysisService / QuotationFacade  →  AiServiceProxy  →  AiServiceA
 
 - **Puntaje final:** la mitad es el promedio ponderado de las cuatro reglas y la otra mitad es la regla más alta, para que un solo problema grave no quede escondido. El nivel sale del puntaje: `low` (menos de 25), `medium` (25 a 49,99), `high` (50 a 74,99) y `critical` (75 o más).
 - **Días de atraso esperados:** el mayor entre los días de atraso de la tarea más atrasada y los días que faltan para alcanzar el ritmo planeado.
-- Cada regla devuelve su puntaje, su peso, sus días de atraso y una frase que explica el resultado (`detail`), por ejemplo `105% of the approved budget is spent`. Se guardan como JSON en la columna `risk_factors`.
+- Cada regla devuelve su puntaje, su peso, sus días de atraso y una frase que explica el resultado (`detail`), por ejemplo `105% of the approved budget is spent`. Con la frase van su código (`detailCode`, por ejemplo `budget_spent`) y sus valores (`detailParams`, por ejemplo `{ "spent": "105" }`), para que el frontend la escriba en español o en inglés. Se guardan como JSON en la columna `risk_factors`.
 - El riesgo se evalúa solo después de cada gasto (`expense`), de cada reporte de avance y de cada tarea completada o reabierta con su botón (`progress_report`), y también cuando un miembro lo pide (`manual`). Las obras completadas o canceladas no se evalúan solas. Cada evaluación se guarda, así que la respuesta trae la última y la historia (las últimas 20, de la más vieja a la más nueva) para dibujar la gráfica.
 - La versión del modelo es `rules-v1` (reglas fijas, sin IA).
 
@@ -457,6 +457,21 @@ BlueprintAnalysisService / QuotationFacade  →  AiServiceProxy  →  AiServiceA
 - Con el mismo patrón, `RiskTriggers` escucha `ExpensesChangedEvent` y `ProgressReportedEvent` para evaluar el riesgo otra vez.
 - Los dos observadores trabajan en su propia transacción: si fallan, el error queda en el log y el gasto, el reporte o la aprobación no se pierden.
 - Cada usuario solo ve y marca sus propias notificaciones; la de otro usuario responde 404 `NOTIFICATION_NOT_FOUND`.
+
+## Textos en dos idiomas
+
+El frontend se puede ver en español o en inglés. El backend no traduce: envía códigos y los valores de cada frase, y el frontend arma la frase en el idioma elegido. El texto en inglés se sigue enviando para otros clientes y para los datos viejos.
+
+| Dónde | Qué se envía además del texto |
+| ----- | ----------------------------- |
+| Errores | `error.code` (ya existía) y, cuando el mensaje tiene valores, `error.params` (por ejemplo `BLUEPRINT_LIMIT_REACHED` con `{ "max": "20" }`) |
+| Mensajes de la cuenta y de eliminación | `code` y `params` en `MessageResponse` (por ejemplo `project_deleted` con la obra y la fecha de borrado) |
+| Reglas de riesgo | `detailCode` y `detailParams` en cada regla |
+| Notificaciones | `params` con los valores del mensaje (obra, versión, montos, nivel, razón principal), guardados en la columna `params` |
+| Filas del presupuesto | `params` con la ciudad, los días y la tarifa o la cantidad de materiales, guardados en la columna `params` |
+
+- La migración **V6** agrega la columna `params` (`jsonb`) a `notifications` y `budget_items`. Para las filas que ya existían, saca los valores de su texto en inglés (presupuestos, aprobaciones y gastos por encima del presupuesto); las notificaciones de riesgo viejas quedan solo con su texto.
+- `TextParams` (en `util/`) guarda y lee esos valores como JSON.
 
 ## Caché
 
