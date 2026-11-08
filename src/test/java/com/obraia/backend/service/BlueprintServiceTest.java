@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -111,6 +112,7 @@ class BlueprintServiceTest {
                 () -> service.upload(project.getId(), userId, "plano.png", BlueprintFixtures.PNG));
 
         assertEquals("BLUEPRINT_LIMIT_REACHED", ex.getCode());
+        assertEquals(Map.of("max", "2"), ex.getParams());
     }
 
     @Test
