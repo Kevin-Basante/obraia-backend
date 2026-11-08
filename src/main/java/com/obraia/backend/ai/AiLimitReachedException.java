@@ -1,6 +1,7 @@
 package com.obraia.backend.ai;
 
 import java.time.Duration;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 
@@ -11,6 +12,7 @@ public class AiLimitReachedException extends AppException {
 
     public AiLimitReachedException(int maxAnalyses, Duration window) {
         super(HttpStatus.TOO_MANY_REQUESTS, "AI_LIMIT_REACHED", "A project can analyze up to " + maxAnalyses
-                + " blueprints every " + window.toMinutes() + " minutes. Try again later");
+                + " blueprints every " + window.toMinutes() + " minutes. Try again later", null,
+                Map.of("max", String.valueOf(maxAnalyses), "minutes", String.valueOf(window.toMinutes())));
     }
 }
