@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -24,6 +25,8 @@ class SpendingPaceStrategyTest {
         // 60% spent - 30% done - 10 of tolerance = 20, twice as score
         assertEquals(new BigDecimal("40.00"), factor.score());
         assertEquals("60% of the budget is spent with 30% of the work done", factor.detail());
+        assertEquals("spending_vs_progress", factor.detailCode());
+        assertEquals(Map.of("spent", "60", "progress", "30"), factor.detailParams());
     }
 
     @Test
