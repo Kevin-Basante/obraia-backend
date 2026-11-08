@@ -98,7 +98,9 @@ class BlueprintAnalysisControllerTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.error.code").value("AI_LIMIT_REACHED"))
                 .andExpect(jsonPath("$.error.message")
-                        .value("A project can analyze up to 5 blueprints every 60 minutes. Try again later"));
+                        .value("A project can analyze up to 5 blueprints every 60 minutes. Try again later"))
+                .andExpect(jsonPath("$.error.params.max").value("5"))
+                .andExpect(jsonPath("$.error.params.minutes").value("60"));
     }
 
     @Test
