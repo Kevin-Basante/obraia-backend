@@ -1,6 +1,7 @@
 package com.obraia.backend.risk;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -23,11 +24,15 @@ public class SpendingPaceStrategy implements RiskStrategy {
     public RiskFactor evaluate(ProjectSnapshot snapshot) {
         BigDecimal spentPct = snapshot.spentPct();
         if (spentPct == null) {
-            return new RiskFactor(CODE, LABEL, RiskScores.ZERO, WEIGHT, 0, "There is no approved budget yet");
+            return new RiskFactor(CODE, LABEL, RiskScores.ZERO, WEIGHT, 0, "There is no approved budget yet",
+                    "no_budget", Map.of());
         }
         String detail = RiskScores.percent(spentPct) + " of the budget is spent with "
                 + RiskScores.percent(snapshot.progressPct()) + " of the work done";
+        Map<String, String> params = Map.of("spent", RiskScores.whole(spentPct),
+                "progress", RiskScores.whole(snapshot.progressPct()));
         BigDecimal gap = spentPct.subtract(snapshot.progressPct()).subtract(TOLERANCE);
-        return new RiskFactor(CODE, LABEL, RiskScores.clamp(gap.multiply(BigDecimal.valueOf(2))), WEIGHT, 0, detail);
+        return new RiskFactor(CODE, LABEL, RiskScores.clamp(gap.multiply(BigDecimal.valueOf(2))), WEIGHT, 0, detail,
+                "spending_vs_progress", params);
     }
 }
