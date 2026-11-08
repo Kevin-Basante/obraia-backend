@@ -532,12 +532,12 @@ src/main/java/com/obraia/backend/
 ├── security/              Tokens JWT, hash de tokens y respuestas 401/403 en JSON
 ├── service/               Lógica de negocio
 ├── storage/               Dónde se guardan los archivos de los planos (base de datos o carpeta)
-├── util/                  Utilidades (búsqueda sin tildes)
+├── util/                  Utilidades (búsqueda sin tildes y valores de las frases en JSON)
 ├── validation/            Reglas de validación propias (contraseña segura)
 └── ObraiaBackendApplication.java   Punto de entrada: inicia el servidor
 src/main/resources/
 ├── application.properties Configuración (lee las variables de entorno)
-└── db/migration/          Migraciones de Flyway (V1, V2, V3...)
+└── db/migration/          Migraciones de Flyway (V1 a V6)
 src/test/                  Pruebas unitarias
 ```
 
