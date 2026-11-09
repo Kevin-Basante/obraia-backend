@@ -252,6 +252,19 @@ Después de `mvnw test`, el informe está en `target/site/jacoco/index.html` (se
 | GET    | `/api/dashboard`                                   | Todas mis obras con su avance, dinero y riesgo, y los totales |
 | GET    | `/api/dashboard/projects/{id}`                     | Resumen de una obra: plan, próximas tareas, dinero, riesgo y conteos |
 
+### Informes PDF
+
+| Método | Ruta                                          | Qué hace                                                      |
+| ------ | --------------------------------------------- | ------------------------------------------------------------- |
+| GET    | `/api/projects/{id}/reports/public?lang=es`   | Informe público en PDF (avance, fases y próximas tareas); cualquier miembro |
+| GET    | `/api/projects/{id}/reports/full?lang=es`     | Informe completo en PDF (además dinero y riesgo); el creador o un miembro aprobado (403 `REPORT_NOT_APPROVED`) |
+| GET    | `/api/projects/{id}/reports/full/access`      | Si el usuario puede descargar el completo: `owner`, `none`, `pending`, `approved` o `expired` |
+| POST   | `/api/projects/{id}/reports/full/requests`    | Pedirle al creador que apruebe el informe completo (le llega un correo) |
+| POST   | `/api/projects/{id}/reports/share`            | Crear un enlace que abre el informe público sin cuenta        |
+| POST   | `/api/reports/approve`                        | **Público.** El creador aprueba con el token del correo       |
+| POST   | `/api/reports/shared`                         | **Público.** Descargar el informe público con el token del enlace compartido |
+| GET    | `/api/ai/wake`                                | Despertar el servicio de IA en segundo plano (responde al instante) |
+
 ### Notificaciones (requieren token)
 
 | Método | Ruta                                     | Qué hace                                         |
