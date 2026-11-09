@@ -201,6 +201,28 @@ class AiServiceProxyTest {
         assertThrows(AiLimitReachedException.class, () -> proxy.summarize(summaryRequest("es", 3)));
     }
 
+    @Test
+    void withoutUrlThereIsNoSummaryAndNothingToWake() {
+        AiServiceProxy proxy = proxy("", 5, 10);
+
+        assertThrows(AiServiceDisabledException.class, () -> proxy.summarize(summaryRequest("es", 1)));
+        proxy.wake();
+
+        verify(provider, never()).getObject();
+    }
+
+    @Test
+    void theWakeUpGoesOutAtMostOnceEveryFewMinutes() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 5, 10);
+
+        proxy.wake();
+        proxy.wake();
+        clock.advance(AiServiceProxy.WAKE_EVERY);
+        proxy.wake();
+
+        verify(adapter, times(2)).wake();
+    }
+
     private SummaryRequest summaryRequest(String language, int progress) {
         return new SummaryRequest(projectId, language, "public", Map.of("work", Map.of("progress_pct", progress)));
     }
