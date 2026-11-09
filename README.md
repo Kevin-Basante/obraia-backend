@@ -556,10 +556,12 @@ src/main/java/com/obraia/backend/
 ├── entity/notification/   Notificaciones y sus tipos
 ├── entity/phase/          Fases, tareas, reportes de avance y sus estados
 ├── entity/project/        Obras, miembros, maestros de obra y solicitudes de eliminación
+├── entity/report/         Solicitudes del informe completo y enlaces compartidos
 ├── entity/risk/           Evaluaciones de riesgo, niveles y qué las disparó
 ├── exception/             Errores de la aplicación y manejador global de errores
 ├── planning/              Fábricas por tipo de obra (Factory Method), planificadores, calculador de materiales y calendario de obra
 ├── quotation/             Cotización: fachada (Facade), capas de costo (Decorator) y resultado (Builder)
+├── report/                Informes PDF: plantilla (Template Method), informe público y completo, textos y formatos
 ├── repository/            Acceso a la base de datos (patrón Repository)
 ├── risk/                  Reglas de riesgo (Strategy), foto de la obra y evaluador
 ├── security/              Tokens JWT, hash de tokens y respuestas 401/403 en JSON
@@ -570,7 +572,8 @@ src/main/java/com/obraia/backend/
 └── ObraiaBackendApplication.java   Punto de entrada: inicia el servidor
 src/main/resources/
 ├── application.properties Configuración (lee las variables de entorno)
-└── db/migration/          Migraciones de Flyway (V1 a V7)
+├── db/migration/          Migraciones de Flyway (V1 a V8)
+└── report/                Textos de los informes PDF en inglés y en español
 src/test/                  Pruebas unitarias
 ```
 
