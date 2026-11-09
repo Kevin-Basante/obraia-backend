@@ -70,13 +70,13 @@ public class AiServiceProxy implements AiServiceClient {
         if (cached != null) {
             return cached.asCached();
         }
-        Instant call = registerCall(request.projectId());
+        Instant call = registerCall(callsByProject, request.projectId());
         BlueprintAnalysis analysis;
         try {
             analysis = adapter().analyze(request);
         } catch (AiServiceException ex) {
             // A failed analysis (for example, the model was busy) does not use up the limit.
-            releaseCall(request.projectId(), call);
+            releaseCall(callsByProject, request.projectId(), call);
             throw ex;
         }
         cache.put(key, analysis);
@@ -84,10 +84,10 @@ public class AiServiceProxy implements AiServiceClient {
     }
 
     /** Counts the call, or refuses it when the project used all the calls of the window. */
-    private synchronized Instant registerCall(UUID projectId) {
+    private synchronized Instant registerCall(Map<UUID, Deque<Instant>> callsOf, UUID projectId) {
         Instant now = clock.instant();
         Instant windowStart = now.minus(properties.limitWindow());
-        Deque<Instant> calls = callsByProject.computeIfAbsent(projectId, id -> new ArrayDeque<>());
+        Deque<Instant> calls = callsOf.computeIfAbsent(projectId, id -> new ArrayDeque<>());
         while (!calls.isEmpty() && !calls.peekFirst().isAfter(windowStart)) {
             calls.pollFirst();
         }
@@ -98,8 +98,8 @@ public class AiServiceProxy implements AiServiceClient {
         return now;
     }
 
-    private synchronized void releaseCall(UUID projectId, Instant call) {
-        Deque<Instant> calls = callsByProject.get(projectId);
+    private synchronized void releaseCall(Map<UUID, Deque<Instant>> callsOf, UUID projectId, Instant call) {
+        Deque<Instant> calls = callsOf.get(projectId);
         if (calls != null) {
             calls.removeLastOccurrence(call);
         }
@@ -114,9 +114,12 @@ public class AiServiceProxy implements AiServiceClient {
 
     /** The same file read for a project with the same floors gives the same answer. */
     static String cacheKey(AnalysisRequest request) {
+        return sha256(request.content()) + ":" + request.floors();
+    }
+
+    private static String sha256(byte[] content) {
         try {
-            byte[] hash = MessageDigest.getInstance("SHA-256").digest(request.content());
-            return HexFormat.of().formatHex(hash) + ":" + request.floors();
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 is not available", ex);
         }
