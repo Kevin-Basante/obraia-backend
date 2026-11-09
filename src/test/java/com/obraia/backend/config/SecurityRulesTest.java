@@ -230,6 +230,12 @@ class SecurityRulesTest {
     }
 
     @Test
+    void theFrontendCanReadTheNameOfADownloadedFile() throws Exception {
+        mvc.perform(post("/api/reports/shared").header("Origin", "https://obraia-frontend.vercel.app"))
+                .andExpect(header().string("Access-Control-Expose-Headers", "Content-Disposition"));
+    }
+
+    @Test
     void otherSitesCannotCallTheApi() throws Exception {
         mvc.perform(options("/api/projects")
                 .header("Origin", "https://evil.example.com")
