@@ -24,6 +24,9 @@ Los scripts que crean la base están en `src/main/resources/db/migration/`. Los 
 | `V3__seed_reference_data.sql` | Datos iniciales en español: roles, permisos, tipos de obra, ciudades, plantillas de fases, materiales y fórmulas |
 | `V4__create_blueprint_files.sql` | Tabla `blueprint_files`: los bytes de los planos cuando se guardan en la base de datos |
 | `V5__add_quotation_rates.sql` | Columna `locations.transport_pct` (% de transporte por ciudad) y tipos de fila `waste` y `transport` en `budget_items` |
+| `V6__add_message_params.sql` | Columna `params` (`jsonb`) en `notifications` y `budget_items`, con los valores de cada frase para mostrarla en dos idiomas |
+| `V7__add_risk_detail_codes.sql` | Código y valores de cada frase en las evaluaciones y notificaciones de riesgo guardadas antes de V6 |
+| `V8__create_report_tables.sql` | Tablas `report_requests` (pedidos del informe completo que aprueba el creador) y `report_shares` (enlaces que abren el informe público) |
 
 Flyway anota cada migración aplicada en la tabla `flyway_schema_history`, así cada script se ejecuta una sola vez por base de datos.
 
