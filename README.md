@@ -104,7 +104,7 @@ Al arrancar, Flyway crea las tablas y carga los datos iniciales si todavía no e
 
 ## Pruebas
 
-Son **562 pruebas** automáticas y ninguna necesita base de datos ni internet, así que se pueden correr en cualquier PC:
+Son **629 pruebas** automáticas y ninguna necesita base de datos ni internet, así que se pueden correr en cualquier PC:
 
 | Tipo | Qué revisan | Ejemplo |
 | ---- | ----------- | ------- |
