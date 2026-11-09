@@ -514,6 +514,7 @@ El backend usa la caché de Spring (`@EnableCaching` en `CacheConfig`) guardada 
 | `projectTypes`, `locations`, `materials`, `phaseTemplates`, `materialFormulas` | Catálogos (`@Cacheable` en los repositorios) | Nunca: solo cambian con migraciones, que reinician el servidor |
 | `budgetVersions`   | Versiones del presupuesto de cada obra (`BudgetVersions.list`) | `@CacheEvict` cada vez que se cotiza o se aprueba |
 | Análisis de la IA  | Últimos 50 planos leídos, por su contenido (caché propia de `AiServiceProxy`) | Sale el más viejo cuando se llena, o al reiniciar el servidor |
+| Resúmenes de la IA | Últimos 50 resúmenes de informes, por sus cifras, el tipo de informe y el idioma (`AiServiceProxy`) | Sale el más viejo cuando se llena, o al reiniciar el servidor |
 
 Para borrar `budgetVersions` en el momento correcto se usa el **patrón Observer** con los eventos de Spring: `BudgetService` publica `BudgetChangedEvent` y `BudgetVersions.onBudgetChanged` lo escucha con `@TransactionalEventListener`, que espera a que el cambio quede guardado en la base de datos antes de borrar la caché.
 Además, los catálogos responden con `Cache-Control: max-age=600` para que el navegador también los guarde.
@@ -526,10 +527,10 @@ Además, los catálogos responden con `Cache-Control: max-age=600` para que el n
 | Decorator       | `CostComponent`, `MaterialsCost` y los decoradores `WasteCost`, `TransportCost`, `LaborCost`, `TaxCost` |
 | Factory Method  | `ProjectCalculatorFactory` y una fábrica por tipo de obra (planificador de fases y calculador de materiales) |
 | Adapter         | `AiServiceAdapter`: traduce las llamadas y respuestas del servicio de IA en Python |
-| Proxy           | `AiServiceProxy`: protección (servicio apagado y límite por obra), caché y carga perezosa del adaptador |
+| Proxy           | `AiServiceProxy`: protección (servicio apagado y límite por obra), caché de análisis y de resúmenes, carga perezosa del adaptador y despertar la IA con moderación |
 | Builder         | `Quotation.builder()`                                                |
 | Bridge          | `BlueprintStorage` con almacenamiento en base de datos o en carpeta  |
-| Template Method | `StandardPhasePlanner`: el algoritmo del plan es fijo y cada tipo de obra pone sus tareas y fases extra |
+| Template Method | `StandardPhasePlanner`: el algoritmo del plan es fijo y cada tipo de obra pone sus tareas y fases extra; `ProjectReportWriter`: el orden del PDF es fijo y cada informe agrega sus secciones |
 | Strategy        | `RiskStrategy`: cuatro reglas de riesgo que `RiskEvaluator` combina; también `EmailSender` (consola o Brevo según `MAIL_PROVIDER`) |
 | Observer        | Eventos de Spring: `RiskTriggers` evalúa el riesgo tras gastos, avances y tareas completadas, `ProjectNotifications` avisa a los miembros y `BudgetVersions` borra la caché |
 | Repository, DTO y capas | Repositorios de Spring Data, objetos de `dto/` y controladores → servicios → repositorios |
