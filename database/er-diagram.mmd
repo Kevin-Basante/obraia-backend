@@ -340,3 +340,28 @@ erDiagram
     timestamptz created_at
     timestamptz updated_at
   }
+
+  projects ||--o{ report_requests : full_report_of
+  users ||--o{ report_requests : asks_for
+  projects ||--o{ report_shares : public_report_of
+  users ||--o{ report_shares : creates
+
+  report_requests {
+    uuid id PK
+    uuid project_id FK
+    uuid requested_by FK
+    varchar token_hash UK
+    varchar status "pending | approved"
+    timestamptz link_expires_at
+    timestamptz approved_at
+    timestamptz download_until
+    timestamptz created_at
+  }
+  report_shares {
+    uuid id PK
+    uuid project_id FK
+    uuid created_by FK
+    varchar token_hash UK
+    timestamptz expires_at
+    timestamptz created_at
+  }
