@@ -28,4 +28,14 @@ public class InvalidTokenException extends AppException {
         return new InvalidTokenException(HttpStatus.BAD_REQUEST, "INVALID_DELETION_TOKEN",
                 "The deletion link is invalid or has expired");
     }
+
+    public static InvalidTokenException reportLink() {
+        return new InvalidTokenException(HttpStatus.BAD_REQUEST, "INVALID_REPORT_TOKEN",
+                "The approval link is invalid, was already used or has expired");
+    }
+
+    public static InvalidTokenException shareLink() {
+        return new InvalidTokenException(HttpStatus.BAD_REQUEST, "INVALID_SHARE_TOKEN",
+                "The shared link is invalid or has expired");
+    }
 }
