@@ -54,4 +54,32 @@ class ProjectEmailServiceTest {
         assertThrows(EmailNotSentException.class, () -> service.sendDeletionConfirmation(user, "Casa", "abc",
                 Duration.ofMinutes(30), Duration.ofDays(30)));
     }
+
+    @Test
+    void reportApprovalEmailGoesToTheCreatorWithTheLink() {
+        User requester = new User("luis@example.com", "hash", "Luis", "Gomez", null);
+
+        service.sendReportApproval(user, requester, "Casa <Norte>", "abc_123", Duration.ofHours(24),
+                Duration.ofHours(24));
+
+        ArgumentCaptor<EmailMessage> message = ArgumentCaptor.forClass(EmailMessage.class);
+        verify(sender).send(message.capture());
+        String html = message.getValue().htmlContent();
+        assertEquals("ana@example.com", message.getValue().to());
+        assertTrue(html.contains("https://obraia-frontend.vercel.app/approve-report?token=abc_123"));
+        assertTrue(html.contains("Luis Gomez"));
+        assertTrue(html.contains("luis@example.com"));
+        assertTrue(html.contains("Casa &lt;Norte&gt;"));
+        assertTrue(html.contains("24 hours"));
+        assertEquals("Luis Gomez asks for the full report of Casa <Norte>", message.getValue().subject());
+    }
+
+    @Test
+    void reportApprovalErrorStopsTheRequest() {
+        User requester = new User("luis@example.com", "hash", "Luis", "Gomez", null);
+        doThrow(new EmailDeliveryException("Brevo is down", null)).when(sender).send(any());
+
+        assertThrows(EmailNotSentException.class, () -> service.sendReportApproval(user, requester, "Casa", "abc",
+                Duration.ofHours(24), Duration.ofHours(24)));
+    }
 }
