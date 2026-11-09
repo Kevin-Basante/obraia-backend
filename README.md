@@ -538,7 +538,7 @@ src/main/java/com/obraia/backend/
 └── ObraiaBackendApplication.java   Punto de entrada: inicia el servidor
 src/main/resources/
 ├── application.properties Configuración (lee las variables de entorno)
-└── db/migration/          Migraciones de Flyway (V1 a V6)
+└── db/migration/          Migraciones de Flyway (V1 a V7)
 src/test/                  Pruebas unitarias
 ```
 
