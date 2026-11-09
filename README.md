@@ -470,7 +470,8 @@ El frontend se puede ver en español o en inglés. El backend no traduce: envía
 | Notificaciones | `params` con los valores del mensaje (obra, versión, montos, nivel, razón principal), guardados en la columna `params` |
 | Filas del presupuesto | `params` con la ciudad, los días y la tarifa o la cantidad de materiales, guardados en la columna `params` |
 
-- La migración **V6** agrega la columna `params` (`jsonb`) a `notifications` y `budget_items`. Para las filas que ya existían, saca los valores de su texto en inglés (presupuestos, aprobaciones y gastos por encima del presupuesto); las notificaciones de riesgo viejas quedan solo con su texto.
+- La migración **V6** agrega la columna `params` (`jsonb`) a `notifications` y `budget_items`. Para las filas que ya existían, saca los valores de su texto en inglés (presupuestos, aprobaciones y gastos por encima del presupuesto).
+- La migración **V7** hace lo mismo con el riesgo: a las evaluaciones y notificaciones de riesgo guardadas antes de V6 les agrega el código y los valores de cada frase, leyendo su texto en inglés. Una frase que no reconoce queda como estaba.
 - `TextParams` (en `util/`) guarda y lee esos valores como JSON.
 
 ## Caché
