@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Collections;
@@ -32,6 +33,7 @@ import com.obraia.backend.report.ReportSummary;
  * <li>Cache: keeps the last analyses by the content of the file, and the
  * last summaries by the figures of the report, so the same question is not
  * sent twice.</li>
+ * <li>The wake-up calls go out at most once every few minutes.</li>
  * <li>Lazy creation: the real adapter (and its HTTP client) is only
  * created the first time a blueprint has to be read.</li>
  * </ul>
@@ -40,6 +42,9 @@ import com.obraia.backend.report.ReportSummary;
 @Primary
 public class AiServiceProxy implements AiServiceClient {
 
+    /** Render sleeps after 15 minutes without calls; one wake-up every 5 minutes is enough. */
+    static final Duration WAKE_EVERY = Duration.ofMinutes(5);
+
     private final AiProperties properties;
     private final ObjectProvider<AiServiceAdapter> adapterProvider;
     private final Clock clock;
@@ -47,6 +52,7 @@ public class AiServiceProxy implements AiServiceClient {
     private final Map<String, ReportSummary> summaries;
     private final Map<UUID, Deque<Instant>> callsByProject = new HashMap<>();
     private final Map<UUID, Deque<Instant>> summariesByProject = new HashMap<>();
+    private Instant lastWake;
     private AiServiceClient adapter;
 
     public AiServiceProxy(AiProperties properties, ObjectProvider<AiServiceAdapter> adapterProvider, Clock clock) {
@@ -116,6 +122,24 @@ public class AiServiceProxy implements AiServiceClient {
         }
         summaries.put(key, summary);
         return summary;
+    }
+
+    /** Wakes the AI service, unless it is off or it was woken a moment ago. */
+    @Override
+    public void wake() {
+        if (!available() || !startWake()) {
+            return;
+        }
+        adapter().wake();
+    }
+
+    private synchronized boolean startWake() {
+        Instant now = clock.instant();
+        if (lastWake != null && now.isBefore(lastWake.plus(WAKE_EVERY))) {
+            return false;
+        }
+        lastWake = now;
+        return true;
     }
 
     /** Counts the call, or refuses it when the project used all the calls of the window. */

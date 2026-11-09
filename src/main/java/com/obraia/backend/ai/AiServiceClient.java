@@ -15,6 +15,12 @@ public interface AiServiceClient {
     /** A short summary with recommendations, written from the figures of a report. */
     ReportSummary summarize(SummaryRequest request);
 
+    /**
+     * Asks the AI service if it is up, so the free plan of Render starts it
+     * before it is needed. It does not use the model nor the limits.
+     */
+    void wake();
+
     /** False when the AI service is not configured, so callers can skip it. */
     default boolean available() {
         return true;

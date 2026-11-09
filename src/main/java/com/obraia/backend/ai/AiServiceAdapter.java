@@ -32,6 +32,7 @@ public class AiServiceAdapter implements AiServiceClient {
 
     static final String ANALYZE_PATH = "/api/v1/blueprints/analyze";
     static final String SUMMARY_PATH = "/api/v1/reports/summary";
+    static final String HEALTH_PATH = "/health";
     static final String TOKEN_HEADER = "X-Service-Token";
     /** Code of obraia-ia when Gemini stays overloaded after its retries. */
     static final String BUSY_CODE = "ANALYZER_BUSY";
@@ -99,6 +100,15 @@ public class AiServiceAdapter implements AiServiceClient {
             throw new AiServiceException("The AI service answered without a summary", null);
         }
         return new ReportSummary(payload.summary().strip(), payload.recommendations(), payload.model());
+    }
+
+    @Override
+    public void wake() {
+        try {
+            restClient.get().uri(HEALTH_PATH).retrieve().toBodilessEntity();
+        } catch (RestClientException ex) {
+            throw new AiServiceException("The AI service did not answer the health check", ex);
+        }
     }
 
     /** The error of obraia-ia, with its own message when it sent one. */
