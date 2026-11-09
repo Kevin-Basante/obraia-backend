@@ -11,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -105,5 +106,20 @@ class ReportSummaryServiceTest {
         Map<String, Object> work = (Map<String, Object>) figures.get("work");
         assertEquals(1, work.get("late_tasks"));
         assertEquals("in_progress", ((List<Map<String, Object>>) work.get("phases")).get(1).get("status"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void theFiguresAreRoundedLikeThePdf() {
+        Map<String, Object> figures = ReportSummaryService.figures(ReportFixtures.fullData());
+
+        Map<String, Object> work = (Map<String, Object>) figures.get("work");
+        assertEquals(new BigDecimal("36.4"), work.get("progress_pct"));
+        Map<String, Object> money = (Map<String, Object>) figures.get("money");
+        assertEquals(new BigDecimal("68645101"), money.get("approved_budget"));
+        assertEquals(new BigDecimal("-11354899"), money.get("remaining"));
+        assertEquals(new BigDecimal("116.5"), money.get("spent_pct"));
+        Map<String, Object> risk = (Map<String, Object>) figures.get("risk");
+        assertEquals(new BigDecimal("89.5"), risk.get("score"));
     }
 }
