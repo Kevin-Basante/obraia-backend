@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -27,9 +28,11 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 
 import com.obraia.backend.config.AiProperties;
+import com.obraia.backend.report.ReportSummary;
 
 class AiServiceProxyTest {
 
+    private static final ReportSummary SUMMARY = new ReportSummary("Bien", List.of("Seguir"), "gemini-test");
     private static final BlueprintAnalysis ANSWER = new BlueprintAnalysis(List.of(), List.of(), 0, "gemini-test",
             false);
 
@@ -171,6 +174,35 @@ class AiServiceProxyTest {
 
         assertFalse(proxy.analyze(request("plano", 1)).cached());
         verify(adapter, times(2)).analyze(any());
+    }
+
+    @Test
+    void theSameFiguresGiveTheSummaryFromTheCache() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 5, 10);
+        when(adapter.summarize(any())).thenReturn(SUMMARY);
+
+        assertEquals(SUMMARY, proxy.summarize(summaryRequest("es", 36)));
+        proxy.summarize(summaryRequest("es", 36));
+        proxy.summarize(summaryRequest("en", 36));
+        proxy.summarize(summaryRequest("es", 40));
+
+        verify(adapter, times(3)).summarize(any());
+    }
+
+    @Test
+    void summariesHaveTheirOwnLimitAndFailuresDoNotCount() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 1, 10);
+        when(adapter.summarize(any())).thenThrow(new AiServiceBusyException(null)).thenReturn(SUMMARY);
+        proxy.analyze(request("plano", 1));
+
+        assertThrows(AiServiceBusyException.class, () -> proxy.summarize(summaryRequest("es", 1)));
+        proxy.summarize(summaryRequest("es", 2));
+
+        assertThrows(AiLimitReachedException.class, () -> proxy.summarize(summaryRequest("es", 3)));
+    }
+
+    private SummaryRequest summaryRequest(String language, int progress) {
+        return new SummaryRequest(projectId, language, "public", Map.of("work", Map.of("progress_pct", progress)));
     }
 
     private AiServiceProxy proxy(String baseUrl, int maxAnalyses, int cacheSize) {
