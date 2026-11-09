@@ -16,16 +16,16 @@ flowchart LR
     F -- "HTTPS + JSON<br/>token JWT" --> B["Backend<br/>Spring Boot<br/>(Render)"]
     B -- "JDBC + Flyway" --> D[("PostgreSQL<br/>(Neon)")]
     B -- "HTTPS + clave compartida" --> I["Servicio de IA<br/>FastAPI<br/>(Render)"]
-    I -- "lee el plano" --> G[Gemini]
+    I -- "lee el plano y resume los informes" --> G[Gemini]
     B -- "API HTTP" --> M[Brevo: correos]
 ```
 
 | Capa | Repositorio | Qué hace |
 | ---- | ----------- | -------- |
 | Presentación | `obraia-frontend` | Pantallas de la aplicación. Solo habla con este backend |
-| Lógica de negocio | `obraia-backend` (este) | Autenticación, obras, planos, fases, cotización, gastos, riesgo y notificaciones |
+| Lógica de negocio | `obraia-backend` (este) | Autenticación, obras, planos, fases, cotización, gastos, riesgo, notificaciones e informes PDF |
 | Datos | `obraia-backend/src/main/resources/db/migration` | Tablas y datos iniciales de PostgreSQL, creados por Flyway |
-| Inteligencia artificial | `obraia-ia` | Lee los planos y devuelve las medidas de cada elemento |
+| Inteligencia artificial | `obraia-ia` | Lee los planos y devuelve las medidas de cada elemento; escribe el resumen de los informes |
 
 Las claves (base de datos, JWT, Brevo, servicio de IA) solo están en las variables de entorno del backend y de `obraia-ia`.
 
@@ -42,7 +42,8 @@ Así se usa ObraIA de principio a fin (es el recorrido de la demostración):
 5. **Cotización:** calcula los materiales y el costo con desperdicio, transporte de la ciudad, mano de obra e IVA (Facade y Decorator). Cada cotización se guarda como una versión del presupuesto.
 6. **Aprobación:** el usuario aprueba una versión y todos los miembros reciben una notificación.
 7. **Seguimiento:** registra los gastos y el avance de las tareas. Después de cada uno se evalúa el riesgo de la obra (Strategy y Observer) y, si se pasa del presupuesto o el riesgo sube, llega una notificación.
-8. **Cierre:** al terminar, la obra pasa a `completed`. El usuario puede eliminar una obra o su cuenta con confirmación por correo; los datos se borran para siempre a los 30 días.
+8. **Informes:** descarga el análisis de la obra en PDF con un resumen de la IA (Template Method). El informe público se puede compartir con un enlace; el completo, con dinero y riesgo, lo aprueba el creador por correo.
+9. **Cierre:** al terminar, la obra pasa a `completed`. El usuario puede eliminar una obra o su cuenta con confirmación por correo; los datos se borran para siempre a los 30 días.
 
 ## Tecnologías
 
@@ -50,6 +51,7 @@ Así se usa ObraIA de principio a fin (es el recorrido de la demostración):
 - Spring Security con tokens JWT para la autenticación
 - PostgreSQL (Neon) con migraciones Flyway
 - Brevo (API HTTP) para enviar los correos de la cuenta
+- OpenPDF para armar los informes en PDF
 - Swagger (springdoc-openapi) para la documentación
 - Docker para el despliegue en Render
 
