@@ -73,6 +73,15 @@ public class ProjectOverviewService {
     @Transactional(readOnly = true)
     public ProjectOverviewResponse overview(UUID projectId, UUID userId) {
         accessService.requireMembership(projectId, userId);
+        return overviewOf(projectId);
+    }
+
+    /**
+     * The same dashboard without checking who asks. Only for callers that
+     * already checked the access, like the reports opened with a shared link.
+     */
+    @Transactional(readOnly = true)
+    public ProjectOverviewResponse overviewOf(UUID projectId) {
         return new ProjectOverviewResponse(projectId, WorkOverviews.from(views.plan(projectId)), money(projectId),
                 risk(projectId), counts(projectId));
     }
