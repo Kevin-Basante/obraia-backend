@@ -1,6 +1,6 @@
 # Base de datos de ObraIA
 
-PostgreSQL con 31 tablas: 10 de autenticación, 20 del dominio (obras, fases, materiales, presupuestos y seguimiento) y 1 para los archivos de los planos (V4).
+PostgreSQL con 33 tablas: 10 de autenticación, 20 del dominio (obras, fases, materiales, presupuestos y seguimiento), 1 para los archivos de los planos (V4) y 2 de los informes PDF (V8).
 En producción la base está en **Neon** (plan gratuito).
 
 ## Diagrama entidad-relación
