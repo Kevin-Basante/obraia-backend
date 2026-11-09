@@ -457,6 +457,22 @@ BlueprintAnalysisService / QuotationFacade  →  AiServiceProxy  →  AiServiceA
 - **Dashboard de todas las obras** (`/api/dashboard`): una tarjeta por obra (la más nueva primero) con su avance, presupuesto aprobado, gastado, % gastado y riesgo, y arriba los totales: cuántas obras hay, cuántas están en curso, cuántas tienen riesgo alto o crítico, la suma de los presupuestos aprobados y la de los gastos.
 - Solo se ven las obras de las que el usuario es miembro; la obra de otra persona responde 404.
 
+## Cómo funcionan los informes PDF
+
+Cada obra tiene dos informes en PDF, en español o en inglés (`lang`), con los colores del sitio:
+
+| Informe | Qué muestra | Quién lo descarga |
+| ------- | ----------- | ----------------- |
+| Público | Datos de la obra, avance, fases con su barra de avance y próximas tareas | Cualquier miembro, y cualquier persona con un enlace compartido |
+| Completo | Lo mismo, más presupuesto, gastos por categoría, riesgo con sus reglas y registros | El creador de la obra, o un miembro que el creador aprobó |
+
+- **Patrón Template Method:** `ProjectReportWriter.write` fija el orden de todo informe (encabezado, datos, resumen de la IA, avance, fases y próximas tareas) y llama a `writeRestrictedSections`, que cada subclase completa: `PublicReportWriter` no agrega nada y `FullReportWriter` agrega dinero, riesgo y registros. El informe público ni siquiera recibe el dinero ni el riesgo (`ReportDataService` los deja en `null`), así no pueden salir por error.
+- **Aprobación del completo:** un miembro que no es el creador lo pide (`.../full/requests`) y al creador le llega un correo con el enlace `/approve-report?token=...`. El enlace vale 24 horas (`app.reports.approval-link-ttl`) y se usa una sola vez. Después de aprobar, el miembro puede descargarlo durante 24 horas (`app.reports.download-window`). En la base solo se guarda el hash SHA-256 del token (tabla `report_requests`, migración **V8**).
+- **Enlace compartido:** cualquier miembro crea un enlace `/shared-report?token=...` que vale 7 días (`app.reports.share-link-ttl`) y solo abre el informe público (tabla `report_shares`). Si la obra se elimina, el enlace deja de funcionar.
+- **Resumen de la IA:** `ReportSummaryService` envía las cifras del informe a `obraia-ia` (`POST /api/v1/reports/summary`) y pone el resumen con recomendaciones al inicio del PDF. Al informe público no se le envían cifras de dinero ni de riesgo. Si la IA está apagada, falla o tarda más de 45 segundos (`app.reports.summary-timeout`), el PDF sale igual, sin resumen. La llamada pasa por `AiServiceProxy`: el mismo informe en el mismo idioma sale de la caché y cada obra tiene su propio límite de resúmenes por hora.
+- **Despertar la IA:** Render apaga `obraia-ia` cuando no se usa y la primera llamada tarda cerca de un minuto. El frontend llama a `/api/ai/wake` al abrir el dashboard de una obra y la página de planos: el backend responde al instante y en segundo plano le pide `/health` a `obraia-ia`, como máximo una vez cada 5 minutos. No usa Gemini ni cuenta para los límites.
+- Los textos del PDF están en `src/main/resources/report/messages.properties` (inglés) y `messages_es.properties` (español). El dinero y los números usan el formato colombiano en los dos idiomas, igual que el frontend.
+
 ## Cómo funcionan las notificaciones
 
 - **Patrón Observer:** los servicios publican eventos de Spring y no saben quién los escucha. `ProjectNotifications` los escucha con `@TransactionalEventListener`, después de que el cambio queda guardado, y avisa a todos los miembros de la obra:
