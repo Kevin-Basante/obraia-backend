@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.net.SocketTimeoutException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,7 @@ import org.springframework.web.client.RestClient;
 
 import com.obraia.backend.config.AiProperties;
 import com.obraia.backend.entity.catalog.ElementType;
+import com.obraia.backend.report.ReportSummary;
 import com.obraia.backend.support.BlueprintFixtures;
 
 /** The adapter against a fake obraia-ia: no real HTTP call is made. */
@@ -38,6 +40,9 @@ class AiServiceAdapterTest {
     private static final String URL = "https://obraia-ia.test";
     private static final AnalysisRequest REQUEST = new AnalysisRequest(UUID.randomUUID(), "plano.png",
             BlueprintFixtures.PNG, 2);
+
+    private static final SummaryRequest SUMMARY_REQUEST = new SummaryRequest(UUID.randomUUID(), "es", "full",
+            Map.of("work", Map.of("progress_pct", new BigDecimal("36.4"))));
 
     private MockRestServiceServer server;
     private AiServiceAdapter adapter;
@@ -198,5 +203,45 @@ class AiServiceAdapterTest {
     void createBuildsTheAdapterFromTheSettings() {
         assertNotNull(AiServiceAdapter.create(new AiProperties(URL, "secret", Duration.ofSeconds(1),
                 Duration.ofSeconds(2), 5, Duration.ofHours(1), 10)));
+    }
+
+    @Test
+    void sendsTheFiguresOfTheReportAsJson() {
+        server.expect(requestTo(URL + AiServiceAdapter.SUMMARY_PATH))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header(AiServiceAdapter.TOKEN_HEADER, "secret"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("""
+                        {"language": "es", "report_type": "full", "figures": {"work": {"progress_pct": 36.4}}}
+                        """))
+                .andRespond(withSuccess("""
+                        {"summary": "  La obra va bien. ", "recommendations": ["Seguir"], "model": "gemini-test"}
+                        """, MediaType.APPLICATION_JSON));
+
+        ReportSummary summary = adapter.summarize(SUMMARY_REQUEST);
+
+        assertEquals("La obra va bien.", summary.summary());
+        assertEquals(List.of("Seguir"), summary.recommendations());
+        assertEquals("gemini-test", summary.model());
+        server.verify();
+    }
+
+    @Test
+    void aSummaryWithoutTextBecomesAiServiceFailed() {
+        server.expect(requestTo(URL + AiServiceAdapter.SUMMARY_PATH))
+                .andRespond(withSuccess("{\"summary\": \" \", \"model\": \"m\"}", MediaType.APPLICATION_JSON));
+
+        AiServiceException ex = assertThrows(AiServiceException.class, () -> adapter.summarize(SUMMARY_REQUEST));
+
+        assertEquals("The AI service answered without a summary", ex.getMessage());
+    }
+
+    @Test
+    void aBusySummaryBecomesAiServiceBusy() {
+        server.expect(requestTo(URL + AiServiceAdapter.SUMMARY_PATH))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE).contentType(MediaType.APPLICATION_JSON)
+                .body("{\"error\": {\"code\": \"ANALYZER_BUSY\", \"message\": \"busy\"}}"));
+
+        assertThrows(AiServiceBusyException.class, () -> adapter.summarize(SUMMARY_REQUEST));
     }
 }
