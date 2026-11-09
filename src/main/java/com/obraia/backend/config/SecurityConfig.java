@@ -50,6 +50,8 @@ public class SecurityConfig {
                         // The email link carries the proof, so the user may open it signed out.
                         .requestMatchers(HttpMethod.POST, "/api/projects/deletion/confirm").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/users/deletion/confirm").permitAll()
+                        // The creator approves with the email link; a shared link opens the public report.
+                        .requestMatchers(HttpMethod.POST, "/api/reports/approve", "/api/reports/shared").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
