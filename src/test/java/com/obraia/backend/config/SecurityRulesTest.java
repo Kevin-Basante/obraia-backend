@@ -99,6 +99,26 @@ class SecurityRulesTest {
             return "account deleted";
         }
 
+        @PostMapping("/api/reports/approve")
+        String approveReport() {
+            return "approved";
+        }
+
+        @PostMapping("/api/reports/shared")
+        String sharedReport() {
+            return "pdf";
+        }
+
+        @GetMapping("/api/projects/{id}/reports/public")
+        String publicReport() {
+            return "pdf";
+        }
+
+        @GetMapping("/api/ai/wake")
+        String wake() {
+            return "awake";
+        }
+
         @GetMapping("/api/projects")
         String projects() {
             return "projects";
@@ -136,6 +156,19 @@ class SecurityRulesTest {
     void emailLinksWorkWithoutToken() throws Exception {
         mvc.perform(post("/api/projects/deletion/confirm")).andExpect(status().isOk());
         mvc.perform(post("/api/users/deletion/confirm")).andExpect(status().isOk());
+    }
+
+    @Test
+    void reportLinksWorkWithoutToken() throws Exception {
+        mvc.perform(post("/api/reports/approve")).andExpect(status().isOk());
+        mvc.perform(post("/api/reports/shared")).andExpect(content().string("pdf"));
+    }
+
+    @Test
+    void reportsOfAProjectAndTheWakeUpNeedAToken() throws Exception {
+        mvc.perform(get("/api/projects/" + UUID.randomUUID() + "/reports/public"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/ai/wake")).andExpect(status().isUnauthorized());
     }
 
     @Test
