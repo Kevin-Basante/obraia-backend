@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.context.ApplicationEventPublisher;
@@ -64,6 +65,13 @@ public class RiskAssessmentService {
                 newestFirst.stream().map(RiskOverviewResponse.Point::from).toList());
         history.sort(Comparator.comparing(RiskOverviewResponse.Point::assessedAt));
         return new RiskOverviewResponse(latest, history);
+    }
+
+    /** The latest assessment with its factors, without checking who asks; empty before the first one. */
+    @Transactional(readOnly = true)
+    public Optional<RiskAssessmentResponse> latestOf(UUID projectId) {
+        return assessmentRepository.findFirstByProjectIdOrderByAssessedAtDesc(projectId)
+                .map(RiskAssessmentService::response);
     }
 
     /** A member asks for a new assessment. */
