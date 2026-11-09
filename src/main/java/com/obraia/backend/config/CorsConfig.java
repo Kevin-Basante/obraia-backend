@@ -30,6 +30,8 @@ public class CorsConfig {
         config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        // The frontend reads the name of a downloaded PDF from this header.
+        config.setExposedHeaders(List.of("Content-Disposition"));
         // The browser can cache the preflight answer for one hour.
         config.setMaxAge(3600L);
 
