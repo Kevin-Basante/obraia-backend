@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
@@ -18,10 +19,11 @@ import org.springframework.web.client.RestClientResponseException;
 import com.obraia.backend.config.AiProperties;
 import com.obraia.backend.entity.catalog.ElementType;
 import com.obraia.backend.exception.BadRequestException;
+import com.obraia.backend.report.ReportSummary;
 
 /**
  * Adapter between the backend and obraia-ia. The Python service speaks
- * HTTP with multipart forms, snake_case names and plain numbers; the
+ * HTTP with multipart forms or JSON, snake_case names and plain numbers; the
  * backend works with {@link AiServiceClient}, ElementType and BigDecimal.
  * This class translates one into the other, so nothing else in the
  * backend knows how the AI service is called.
@@ -29,6 +31,7 @@ import com.obraia.backend.exception.BadRequestException;
 public class AiServiceAdapter implements AiServiceClient {
 
     static final String ANALYZE_PATH = "/api/v1/blueprints/analyze";
+    static final String SUMMARY_PATH = "/api/v1/reports/summary";
     static final String TOKEN_HEADER = "X-Service-Token";
     /** Code of obraia-ia when Gemini stays overloaded after its retries. */
     static final String BUSY_CODE = "ANALYZER_BUSY";
@@ -72,6 +75,30 @@ public class AiServiceAdapter implements AiServiceClient {
             throw new AiServiceException("The AI service answered without measurements", null);
         }
         return toAnalysis(payload);
+    }
+
+    @Override
+    public ReportSummary summarize(SummaryRequest request) {
+        AiSummaryPayload payload;
+        try {
+            payload = restClient.post()
+                    .uri(SUMMARY_PATH)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("language", request.language(), "report_type", request.reportType(),
+                            "figures", request.figures()))
+                    .retrieve()
+                    .body(AiSummaryPayload.class);
+        } catch (RestClientResponseException ex) {
+            throw failure(ex);
+        } catch (ResourceAccessException ex) {
+            throw new AiServiceException("The AI service could not be reached or did not answer in time", ex);
+        } catch (RestClientException ex) {
+            throw new AiServiceException("The answer of the AI service could not be read", ex);
+        }
+        if (payload == null || payload.summary() == null || payload.summary().isBlank()) {
+            throw new AiServiceException("The AI service answered without a summary", null);
+        }
+        return new ReportSummary(payload.summary().strip(), payload.recommendations(), payload.model());
     }
 
     /** The error of obraia-ia, with its own message when it sent one. */

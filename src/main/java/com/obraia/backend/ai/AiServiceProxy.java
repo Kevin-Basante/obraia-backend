@@ -1,5 +1,6 @@
 package com.obraia.backend.ai;
 
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
@@ -18,16 +19,19 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import com.obraia.backend.config.AiProperties;
+import com.obraia.backend.report.ReportSummary;
 
 /**
  * Proxy of the AI service. It has the same interface as the adapter and
  * stands in front of it, so the callers do not notice it:
  * <ul>
  * <li>Protection: refuses the call when the AI service is not configured
- * and limits how many analyses each project makes, because the free plan
- * of the model has a quota. Only the analyses that work count.</li>
- * <li>Cache: keeps the last analyses by the content of the file, so the
- * same blueprint is not sent twice.</li>
+ * and limits how many analyses and how many report summaries each project
+ * makes, because the free plan of the model has a quota. Only the calls
+ * that work count.</li>
+ * <li>Cache: keeps the last analyses by the content of the file, and the
+ * last summaries by the figures of the report, so the same question is not
+ * sent twice.</li>
  * <li>Lazy creation: the real adapter (and its HTTP client) is only
  * created the first time a blueprint has to be read.</li>
  * </ul>
@@ -40,7 +44,9 @@ public class AiServiceProxy implements AiServiceClient {
     private final ObjectProvider<AiServiceAdapter> adapterProvider;
     private final Clock clock;
     private final Map<String, BlueprintAnalysis> cache;
+    private final Map<String, ReportSummary> summaries;
     private final Map<UUID, Deque<Instant>> callsByProject = new HashMap<>();
+    private final Map<UUID, Deque<Instant>> summariesByProject = new HashMap<>();
     private AiServiceClient adapter;
 
     public AiServiceProxy(AiProperties properties, ObjectProvider<AiServiceAdapter> adapterProvider, Clock clock) {
@@ -50,6 +56,12 @@ public class AiServiceProxy implements AiServiceClient {
         this.cache = Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<String, BlueprintAnalysis> eldest) {
+                return size() > properties.cacheSize();
+            }
+        });
+        this.summaries = Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, ReportSummary> eldest) {
                 return size() > properties.cacheSize();
             }
         });
@@ -81,6 +93,29 @@ public class AiServiceProxy implements AiServiceClient {
         }
         cache.put(key, analysis);
         return analysis;
+    }
+
+    /** Same figures, same summary: a report downloaded twice asks the AI once. */
+    @Override
+    public ReportSummary summarize(SummaryRequest request) {
+        if (!available()) {
+            throw new AiServiceDisabledException();
+        }
+        String key = summaryKey(request);
+        ReportSummary cached = summaries.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        Instant call = registerCall(summariesByProject, request.projectId());
+        ReportSummary summary;
+        try {
+            summary = adapter().summarize(request);
+        } catch (AiServiceException ex) {
+            releaseCall(summariesByProject, request.projectId(), call);
+            throw ex;
+        }
+        summaries.put(key, summary);
+        return summary;
     }
 
     /** Counts the call, or refuses it when the project used all the calls of the window. */
@@ -115,6 +150,12 @@ public class AiServiceProxy implements AiServiceClient {
     /** The same file read for a project with the same floors gives the same answer. */
     static String cacheKey(AnalysisRequest request) {
         return sha256(request.content()) + ":" + request.floors();
+    }
+
+    /** The same figures in the same language and report give the same summary. */
+    static String summaryKey(SummaryRequest request) {
+        String text = request.language() + "|" + request.reportType() + "|" + request.figures();
+        return sha256(text.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String sha256(byte[] content) {
