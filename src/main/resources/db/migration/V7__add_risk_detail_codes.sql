@@ -53,6 +53,50 @@ BEGIN
 END;
 $$;
 
+-- Values of an English risk notification, with the same keys the backend uses
+-- since V6 ("reason" and "reason.<value>" for the main factor); null when the text is not known.
+CREATE FUNCTION pg_temp.risk_notification_params(message text) RETURNS jsonb
+    LANGUAGE plpgsql IMMUTABLE AS
+$$
+DECLARE
+    rest text := message;
+    days text := '0';
+    m text[];
+    reason jsonb;
+    params jsonb;
+BEGIN
+    -- "... About 12 days of delay are expected." goes at the end.
+    m := regexp_match(rest, ' About (\d+) days of delay are expected\.$');
+    IF m IS NOT NULL THEN
+        days := m[1];
+        rest := regexp_replace(rest, ' About \d+ days of delay are expected\.$', '');
+    END IF;
+    IF right(rest, 1) <> '.' THEN
+        RETURN NULL;
+    END IF;
+    rest := left(rest, -1);
+
+    m := regexp_match(rest, '^The risk of "(.*)" rose to (low|medium|high|critical) \((\d+(?:\.\d+)?) of 100\)(: .*)?$');
+    IF m IS NULL THEN
+        RETURN NULL;
+    END IF;
+    params := jsonb_build_object('project', m[1], 'level', m[2], 'score', m[3], 'delayDays', days);
+    IF m[4] IS NULL THEN
+        RETURN params;
+    END IF;
+
+    reason := pg_temp.risk_detail(substring(m[4] FROM 3));
+    IF reason IS NULL THEN
+        RETURN NULL;
+    END IF;
+    params := params || jsonb_build_object('reason', reason ->> 'detailCode');
+    SELECT params || coalesce(jsonb_object_agg('reason.' || key, value), '{}'::jsonb)
+    INTO params
+    FROM jsonb_each(reason -> 'detailParams');
+    RETURN params;
+END;
+$$;
+
 -- Risk factors without a code get it from their sentence; the order of the factors does not change.
 UPDATE risk_assessments
 SET risk_factors = (
@@ -68,4 +112,12 @@ WHERE jsonb_typeof(risk_factors) = 'array'
               FROM jsonb_array_elements(risk_factors) AS factors(factor)
               WHERE factor ->> 'detailCode' IS NULL);
 
+-- Risk notifications without values get them from their message.
+UPDATE notifications
+SET params = pg_temp.risk_notification_params(message)
+WHERE type = 'delay_risk'
+  AND params IS NULL
+  AND pg_temp.risk_notification_params(message) IS NOT NULL;
+
+DROP FUNCTION pg_temp.risk_notification_params(text);
 DROP FUNCTION pg_temp.risk_detail(text);
