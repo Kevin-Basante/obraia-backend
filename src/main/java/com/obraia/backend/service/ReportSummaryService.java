@@ -1,5 +1,7 @@
 package com.obraia.backend.service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -73,7 +75,9 @@ public class ReportSummaryService {
     /**
      * The figures the AI reads, with the names obraia-ia expects. Only what
      * the report itself shows is sent, so the public summary never talks
-     * about money.
+     * about money. The numbers are rounded like the PDF shows them (whole
+     * pesos, percents with one decimal), so the summary repeats the same
+     * figures and not 20,45% or $ 55.275.411,39.
      */
     static Map<String, Object> figures(ReportData data) {
         Map<String, Object> figures = new LinkedHashMap<>();
@@ -95,7 +99,7 @@ public class ReportSummaryService {
         values.put("type", project.projectTypeName());
         values.put("city", project.city());
         values.put("status", project.status().code());
-        values.put("built_area_m2", project.builtAreaM2());
+        values.put("built_area_m2", rounded(project.builtAreaM2(), 1));
         values.put("floors", floors);
         values.put("planned_start", text(project.plannedStartDate()));
         values.put("planned_end", text(project.plannedEndDate()));
@@ -104,7 +108,7 @@ public class ReportSummaryService {
 
     private static Map<String, Object> work(WorkOverview work) {
         Map<String, Object> values = new LinkedHashMap<>();
-        values.put("progress_pct", work.progressPct());
+        values.put("progress_pct", percent(work.progressPct()));
         values.put("phase_count", work.phaseCount());
         values.put("completed_phases", work.completedPhases());
         values.put("task_count", work.taskCount());
@@ -115,7 +119,7 @@ public class ReportSummaryService {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("name", phase.name());
             row.put("status", phase.status().code());
-            row.put("progress_pct", phase.progressPct());
+            row.put("progress_pct", percent(phase.progressPct()));
             row.put("late", phase.late());
             row.put("planned_end", text(phase.plannedEndDate()));
             return row;
@@ -125,7 +129,7 @@ public class ReportSummaryService {
             row.put("name", task.name());
             row.put("phase", task.phaseName());
             row.put("status", task.status().code());
-            row.put("progress_pct", task.progressPct());
+            row.put("progress_pct", percent(task.progressPct()));
             row.put("late", task.late());
             row.put("planned_end", text(task.plannedEndDate()));
             return row;
@@ -135,16 +139,16 @@ public class ReportSummaryService {
 
     private static Map<String, Object> money(MoneyOverview money) {
         Map<String, Object> values = new LinkedHashMap<>();
-        values.put("approved_budget", money.approvedBudget());
-        values.put("total_spent", money.totalSpent());
-        values.put("remaining", money.remaining());
-        values.put("spent_pct", money.spentPct());
+        values.put("approved_budget", pesos(money.approvedBudget()));
+        values.put("total_spent", pesos(money.totalSpent()));
+        values.put("remaining", pesos(money.remaining()));
+        values.put("spent_pct", percent(money.spentPct()));
         values.put("budget_versions", money.budgetVersions());
         values.put("expense_count", money.expenseCount());
         values.put("by_category", money.byCategory().stream().map(total -> {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("category", total.category().code());
-            row.put("amount", total.amount());
+            row.put("amount", pesos(total.amount()));
             row.put("count", total.count());
             return row;
         }).toList());
@@ -154,7 +158,7 @@ public class ReportSummaryService {
     private static Map<String, Object> risk(RiskAssessmentResponse risk) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("level", risk.level().code());
-        values.put("score", risk.score());
+        values.put("score", percent(risk.score()));
         values.put("predicted_delay_days", risk.predictedDelayDays());
         List<Map<String, Object>> factors = risk.factors().stream().map(factor -> {
             Map<String, Object> row = new LinkedHashMap<>();
@@ -166,6 +170,20 @@ public class ReportSummaryService {
         }).toList();
         values.put("factors", factors);
         return values;
+    }
+
+    /** Whole pesos, as the PDF writes them. */
+    private static BigDecimal pesos(BigDecimal amount) {
+        return rounded(amount, 0);
+    }
+
+    /** One decimal, as the PDF writes percents and scores. */
+    private static BigDecimal percent(BigDecimal value) {
+        return rounded(value, 1);
+    }
+
+    private static BigDecimal rounded(BigDecimal value, int decimals) {
+        return value == null ? null : value.setScale(decimals, RoundingMode.HALF_UP);
     }
 
     private static String text(LocalDate date) {
