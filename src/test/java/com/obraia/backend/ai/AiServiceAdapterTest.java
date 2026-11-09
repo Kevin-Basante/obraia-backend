@@ -244,4 +244,23 @@ class AiServiceAdapterTest {
 
         assertThrows(AiServiceBusyException.class, () -> adapter.summarize(SUMMARY_REQUEST));
     }
+
+    @Test
+    void wakeAsksForTheHealth() {
+        server.expect(requestTo(URL + AiServiceAdapter.HEALTH_PATH))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"status\": \"UP\"}", MediaType.APPLICATION_JSON));
+
+        adapter.wake();
+
+        server.verify();
+    }
+
+    @Test
+    void aWakeUpWithoutAnswerBecomesAiServiceFailed() {
+        server.expect(requestTo(URL + AiServiceAdapter.HEALTH_PATH))
+                .andRespond(withException(new SocketTimeoutException("asleep")));
+
+        assertThrows(AiServiceException.class, () -> adapter.wake());
+    }
 }
