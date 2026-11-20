@@ -23,6 +23,7 @@ class AiControllerTest {
 
         mvc.perform(get("/api/ai/wake"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.enabled").value(true));
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.url").value("https://obraia-ia.test/health"));
     }
 }

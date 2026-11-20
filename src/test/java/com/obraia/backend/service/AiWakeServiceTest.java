@@ -1,6 +1,8 @@
 package com.obraia.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import com.obraia.backend.ai.AiServiceClient;
 import com.obraia.backend.ai.AiServiceException;
 import com.obraia.backend.config.AiProperties;
+import com.obraia.backend.dto.ai.AiWakeResponse;
 
 class AiWakeServiceTest {
 
@@ -49,6 +52,14 @@ class AiWakeServiceTest {
     }
 
     @Test
+    void theAnswerGivesTheBrowserTheHealthCheckOfTheAi() {
+        when(ai.available()).thenReturn(true);
+
+        // The slash at the end of the setting is not repeated.
+        assertEquals("https://obraia-ia.test/health", service.wake().url());
+    }
+
+    @Test
     void aFailedWakeUpIsIgnored() {
         when(ai.available()).thenReturn(true);
         doThrow(new AiServiceException("asleep", null)).when(ai).wake();
@@ -65,8 +76,10 @@ class AiWakeServiceTest {
     void withoutTheAiNothingIsWoken() {
         when(ai.available()).thenReturn(false);
 
-        assertFalse(service.wake().enabled());
+        AiWakeResponse answer = service.wake();
 
+        assertFalse(answer.enabled());
+        assertNull(answer.url());
         verify(ai, never()).wake();
     }
 }
