@@ -3,6 +3,7 @@ package com.obraia.backend.ai;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -15,6 +16,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import java.math.BigDecimal;
+import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.time.Duration;
 import java.util.List;
@@ -166,9 +168,32 @@ class AiServiceAdapterTest {
                 .contentType(MediaType.TEXT_HTML)
                 .body("<html>Bad gateway</html>"));
 
+        AiServiceException ex = assertThrows(AiServiceUnreachableException.class, () -> adapter.analyze(REQUEST));
+
+        assertEquals("AI_SERVICE_FAILED", ex.getCode());
+        assertEquals("The AI service answered 502", ex.getMessage());
+    }
+
+    @Test
+    void otherErrorPagesAreNotMarkedAsUnreached() {
+        server.expect(requestTo(URL + AiServiceAdapter.ANALYZE_PATH))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR).contentType(MediaType.TEXT_HTML)
+                        .body("<html>Error</html>"));
+
         AiServiceException ex = assertThrows(AiServiceException.class, () -> adapter.analyze(REQUEST));
 
-        assertEquals("The AI service answered 502", ex.getMessage());
+        assertFalse(ex instanceof AiServiceUnreachableException);
+    }
+
+    @Test
+    void aConnectionThatFailsIsMarkedAsUnreached() {
+        server.expect(requestTo(URL + AiServiceAdapter.ANALYZE_PATH))
+                .andRespond(withException(new ConnectException("Connection refused")));
+
+        AiServiceException ex = assertThrows(AiServiceException.class, () -> adapter.analyze(REQUEST));
+
+        assertInstanceOf(AiServiceUnreachableException.class, ex);
+        assertEquals("The AI service could not be reached or did not answer in time", ex.getMessage());
     }
 
     @Test
@@ -179,6 +204,8 @@ class AiServiceAdapterTest {
         AiServiceException ex = assertThrows(AiServiceException.class, () -> adapter.analyze(REQUEST));
 
         assertEquals("The AI service could not be reached or did not answer in time", ex.getMessage());
+        // It may have reached the model, so it is not tried again.
+        assertFalse(ex instanceof AiServiceUnreachableException);
     }
 
     @Test
