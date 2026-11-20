@@ -35,9 +35,10 @@ import com.obraia.backend.report.ReportSummary;
  * last summaries by the figures of the report, so the same question is not
  * sent twice.</li>
  * <li>Wake-up: before an analysis or a summary, it checks that the
- * service is awake when it has not answered for a while, and tries the call
- * once more when it did not reach the service. The wake-up calls of the
- * pages go out at most once every few minutes.</li>
+ * service is awake when it has not answered for a while, waiting about a
+ * minute for it to start, and tries the call once more when it did not
+ * reach the service. The wake-up calls of the pages go out at most once
+ * every few minutes.</li>
  * <li>Lazy creation: the real adapter (and its HTTP client) is only
  * created the first time a blueprint has to be read.</li>
  * </ul>
@@ -50,6 +51,10 @@ public class AiServiceProxy implements AiServiceClient {
     static final Duration WAKE_EVERY = Duration.ofMinutes(5);
     /** After this time without answers the service may be asleep, so it is woken before a call. */
     static final Duration AWAKE_FOR = Duration.ofMinutes(10);
+    /** The browser wakes the service and it starts in about a minute; the backend waits that long at most. */
+    static final Duration WAKE_WAIT = Duration.ofSeconds(60);
+    /** Time between two health checks while waiting. */
+    static final Duration WAKE_POLL = Duration.ofSeconds(5);
 
     private final AiProperties properties;
     private final ObjectProvider<AiServiceAdapter> adapterProvider;
@@ -165,14 +170,14 @@ public class AiServiceProxy implements AiServiceClient {
 
     /**
      * Makes a call to the service. If it has not answered for a while, it
-     * is woken first: the free plan of Render puts it to sleep, and a call
-     * sent while it starts can get an error page instead of an answer. If
-     * the call still did not reach the service, it waits until the service
-     * answers its health check and tries once more.
+     * waits until it answers its health check: the free plan of Render puts
+     * it to sleep, and a call sent while it starts gets an answer of Render
+     * instead of obraia-ia. If the call still did not reach the service, it
+     * waits again and tries once more.
      */
     private <T> T callAwake(Supplier<T> call) {
-        if (!answeredSince(clock.instant().minus(AWAKE_FOR))) {
-            wakeAndWait();
+        if (!answeredSince(clock.instant().minus(AWAKE_FOR)) && !wakeAndWait()) {
+            throw new AiServiceUnreachableException("The AI service is still waking up", null);
         }
         T answer;
         try {
@@ -187,15 +192,36 @@ public class AiServiceProxy implements AiServiceClient {
         return answer;
     }
 
-    /** Asks for the health and waits for the answer; false when the service does not answer. */
+    /**
+     * Asks for the health every few seconds until the service answers;
+     * false when it does not answer within the wait. Render only wakes the
+     * service for calls from outside, so the browser of the user wakes it
+     * and the backend waits here.
+     */
     private boolean wakeAndWait() {
+        Instant deadline = clock.instant().plus(WAKE_WAIT);
+        while (true) {
+            try {
+                adapter().wake();
+                markAnswered();
+                return true;
+            } catch (AiServiceException ex) {
+                if (clock.instant().plus(WAKE_POLL).isAfter(deadline) || !pause(WAKE_POLL)) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    /** Waits between two health checks; false when the thread is stopped. */
+    boolean pause(Duration time) {
         try {
-            adapter().wake();
-        } catch (AiServiceException ex) {
+            Thread.sleep(time.toMillis());
+            return true;
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
             return false;
         }
-        markAnswered();
-        return true;
     }
 
     private synchronized boolean answeredSince(Instant moment) {

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -265,16 +266,23 @@ class AiServiceProxyTest {
     }
 
     @Test
-    void whenTheServiceDoesNotWakeUpTheAnalysisFailsWithoutUsingTheLimit() {
+    void whenTheServiceDoesNotWakeUpTheAnalysisIsNotSentAndDoesNotUseTheLimit() {
         doThrow(new AiServiceException("asleep", null)).when(adapter).wake();
-        when(adapter.analyze(any())).thenThrow(new AiServiceUnreachableException("Render page", null))
-                .thenReturn(ANSWER);
         AiServiceProxy proxy = proxy("https://obraia-ia.test", 1, 10);
+        Instant start = clock.instant();
 
-        assertThrows(AiServiceUnreachableException.class, () -> proxy.analyze(request("plano", 1)));
-        verify(adapter, times(1)).analyze(any());
+        AiServiceException ex = assertThrows(AiServiceUnreachableException.class,
+                () -> proxy.analyze(request("plano", 1)));
 
+        assertEquals("AI_SERVICE_WAKING", ex.getCode());
+        verify(adapter, never()).analyze(any());
+        // One health check every 5 seconds during one minute.
+        verify(adapter, times(13)).wake();
+        assertEquals(start.plus(AiServiceProxy.WAKE_WAIT), clock.instant());
+
+        doNothing().when(adapter).wake();
         proxy.analyze(request("plano", 1));
+        verify(adapter, times(1)).analyze(any());
     }
 
     @Test
@@ -324,10 +332,20 @@ class AiServiceProxyTest {
         return new SummaryRequest(projectId, language, "public", Map.of("work", Map.of("progress_pct", progress)));
     }
 
+    /** A proxy whose pauses move the clock forward instead of making the test wait. */
     private AiServiceProxy proxy(String baseUrl, int maxAnalyses, int cacheSize) {
-        AiProperties properties = new AiProperties(baseUrl, "secret", Duration.ofSeconds(1), Duration.ofSeconds(1),
-                maxAnalyses, Duration.ofHours(1), cacheSize);
-        return new AiServiceProxy(properties, provider, clock);
+        return new AiServiceProxy(properties(baseUrl, maxAnalyses, cacheSize), provider, clock) {
+            @Override
+            boolean pause(Duration time) {
+                clock.advance(time);
+                return true;
+            }
+        };
+    }
+
+    private static AiProperties properties(String baseUrl, int maxAnalyses, int cacheSize) {
+        return new AiProperties(baseUrl, "secret", Duration.ofSeconds(1), Duration.ofSeconds(1), maxAnalyses,
+                Duration.ofHours(1), cacheSize);
     }
 
     private AnalysisRequest request(String content, int floors) {
