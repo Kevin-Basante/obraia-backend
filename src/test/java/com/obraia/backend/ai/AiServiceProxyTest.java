@@ -266,6 +266,20 @@ class AiServiceProxyTest {
     }
 
     @Test
+    void theAnalysisWaitsWhileTheServiceStarts() {
+        doThrow(new AiServiceException("starting", null)).doThrow(new AiServiceException("starting", null))
+                .doNothing().when(adapter).wake();
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 5, 10);
+        Instant start = clock.instant();
+
+        assertEquals(ANSWER, proxy.analyze(request("plano", 1)));
+
+        verify(adapter, times(3)).wake();
+        verify(adapter, times(1)).analyze(any());
+        assertEquals(start.plus(AiServiceProxy.WAKE_POLL.multipliedBy(2)), clock.instant());
+    }
+
+    @Test
     void whenTheServiceDoesNotWakeUpTheAnalysisIsNotSentAndDoesNotUseTheLimit() {
         doThrow(new AiServiceException("asleep", null)).when(adapter).wake();
         AiServiceProxy proxy = proxy("https://obraia-ia.test", 1, 10);
@@ -283,6 +297,17 @@ class AiServiceProxyTest {
         doNothing().when(adapter).wake();
         proxy.analyze(request("plano", 1));
         verify(adapter, times(1)).analyze(any());
+    }
+
+    @Test
+    void thePauseStopsWhenTheThreadIsInterrupted() {
+        AiServiceProxy proxy = new AiServiceProxy(properties("https://obraia-ia.test", 5, 10), provider, clock);
+
+        assertTrue(proxy.pause(Duration.ofMillis(1)));
+        Thread.currentThread().interrupt();
+        assertFalse(proxy.pause(Duration.ofSeconds(5)));
+        // interrupted() also clears the flag for the next tests.
+        assertTrue(Thread.interrupted());
     }
 
     @Test
