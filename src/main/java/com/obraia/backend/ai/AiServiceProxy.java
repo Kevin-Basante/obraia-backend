@@ -35,7 +35,8 @@ import com.obraia.backend.report.ReportSummary;
  * last summaries by the figures of the report, so the same question is not
  * sent twice.</li>
  * <li>Wake-up: before an analysis or a summary, it checks that the
- * service is awake when it has not answered for a while. The wake-up calls of the
+ * service is awake when it has not answered for a while, and tries the call
+ * once more when it did not reach the service. The wake-up calls of the
  * pages go out at most once every few minutes.</li>
  * <li>Lazy creation: the real adapter (and its HTTP client) is only
  * created the first time a blueprint has to be read.</li>
@@ -151,13 +152,23 @@ public class AiServiceProxy implements AiServiceClient {
     /**
      * Makes a call to the service. If it has not answered for a while, it
      * is woken first: the free plan of Render puts it to sleep, and a call
-     * sent while it starts can get an error page instead of an answer.
+     * sent while it starts can get an error page instead of an answer. If
+     * the call still did not reach the service, it waits until the service
+     * answers its health check and tries once more.
      */
     private <T> T callAwake(Supplier<T> call) {
         if (!answeredSince(clock.instant().minus(AWAKE_FOR))) {
             wakeAndWait();
         }
-        T answer = call.get();
+        T answer;
+        try {
+            answer = call.get();
+        } catch (AiServiceUnreachableException ex) {
+            if (!wakeAndWait()) {
+                throw ex;
+            }
+            answer = call.get();
+        }
         markAnswered();
         return answer;
     }
