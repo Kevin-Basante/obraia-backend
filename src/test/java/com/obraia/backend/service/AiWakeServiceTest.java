@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 
 import com.obraia.backend.ai.AiServiceClient;
 import com.obraia.backend.ai.AiServiceException;
+import com.obraia.backend.config.AiProperties;
 
 class AiWakeServiceTest {
 
@@ -33,7 +35,7 @@ class AiWakeServiceTest {
             call.<Runnable>getArgument(0).run();
             return null;
         }).when(executor).execute(any());
-        service = new AiWakeService(ai, executor);
+        service = new AiWakeService(ai, properties("https://obraia-ia.test/"), executor);
     }
 
     @Test
@@ -52,6 +54,11 @@ class AiWakeServiceTest {
         doThrow(new AiServiceException("asleep", null)).when(ai).wake();
 
         assertTrue(service.wake().enabled());
+    }
+
+    private static AiProperties properties(String baseUrl) {
+        return new AiProperties(baseUrl, "token", Duration.ofSeconds(1), Duration.ofSeconds(1), 5, Duration.ofHours(1),
+                10);
     }
 
     @Test

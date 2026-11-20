@@ -18,7 +18,7 @@ class AiControllerTest {
     @Test
     void wakeAnswersAtOnce() throws Exception {
         AiWakeService wakeService = mock(AiWakeService.class);
-        when(wakeService.wake()).thenReturn(new AiWakeResponse(true));
+        when(wakeService.wake()).thenReturn(new AiWakeResponse(true, "https://obraia-ia.test/health"));
         MockMvc mvc = MockMvcBuilders.standaloneSetup(new AiController(wakeService)).build();
 
         mvc.perform(get("/api/ai/wake"))
