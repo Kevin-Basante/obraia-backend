@@ -131,22 +131,36 @@ public class AiServiceProxy implements AiServiceClient {
         return summary;
     }
 
-    /** Wakes the AI service, unless it is off or it was woken a moment ago. */
+    /** Wakes the AI service, unless it is off, it answered a moment ago or it was woken a moment ago. */
     @Override
     public void wake() {
         if (!available() || !startWake()) {
             return;
         }
-        adapter().wake();
+        try {
+            adapter().wake();
+        } catch (AiServiceException ex) {
+            // The next page that opens can try again right away.
+            forgetWake();
+            throw ex;
+        }
+        markAnswered();
     }
 
     private synchronized boolean startWake() {
         Instant now = clock.instant();
+        if (answeredSince(now.minus(WAKE_EVERY))) {
+            return false;
+        }
         if (lastWake != null && now.isBefore(lastWake.plus(WAKE_EVERY))) {
             return false;
         }
         lastWake = now;
         return true;
+    }
+
+    private synchronized void forgetWake() {
+        lastWake = null;
     }
 
     /**
