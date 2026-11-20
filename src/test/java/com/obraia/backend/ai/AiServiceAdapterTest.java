@@ -170,7 +170,8 @@ class AiServiceAdapterTest {
 
         AiServiceException ex = assertThrows(AiServiceUnreachableException.class, () -> adapter.analyze(REQUEST));
 
-        assertEquals("AI_SERVICE_FAILED", ex.getCode());
+        assertEquals("AI_SERVICE_WAKING", ex.getCode());
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ex.getStatus());
         assertEquals("The AI service answered 502", ex.getMessage());
     }
 
