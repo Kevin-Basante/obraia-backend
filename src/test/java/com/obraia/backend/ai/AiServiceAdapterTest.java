@@ -175,6 +175,26 @@ class AiServiceAdapterTest {
     }
 
     @Test
+    void theTooManyRequestsAnswerOfRenderIsMarkedAsUnreached() {
+        // Render answers 429 to other Render services while obraia-ia sleeps.
+        server.expect(requestTo(URL + AiServiceAdapter.ANALYZE_PATH))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).contentType(MediaType.TEXT_HTML)
+                        .body("<html>Too many requests</html>"));
+
+        AiServiceException ex = assertThrows(AiServiceUnreachableException.class, () -> adapter.analyze(REQUEST));
+
+        assertEquals("The AI service answered 429", ex.getMessage());
+    }
+
+    @Test
+    void theHealthCheckOfASleepingServiceFails() {
+        server.expect(requestTo(URL + AiServiceAdapter.HEALTH_PATH))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        assertThrows(AiServiceException.class, adapter::wake);
+    }
+
+    @Test
     void otherErrorPagesAreNotMarkedAsUnreached() {
         server.expect(requestTo(URL + AiServiceAdapter.ANALYZE_PATH))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR).contentType(MediaType.TEXT_HTML)
