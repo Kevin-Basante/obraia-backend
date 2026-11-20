@@ -14,6 +14,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Primary;
@@ -33,7 +34,9 @@ import com.obraia.backend.report.ReportSummary;
  * <li>Cache: keeps the last analyses by the content of the file, and the
  * last summaries by the figures of the report, so the same question is not
  * sent twice.</li>
- * <li>The wake-up calls go out at most once every few minutes.</li>
+ * <li>Wake-up: before an analysis or a summary, it checks that the
+ * service is awake when it has not answered for a while. The wake-up calls of the
+ * pages go out at most once every few minutes.</li>
  * <li>Lazy creation: the real adapter (and its HTTP client) is only
  * created the first time a blueprint has to be read.</li>
  * </ul>
@@ -44,6 +47,8 @@ public class AiServiceProxy implements AiServiceClient {
 
     /** Render sleeps after 15 minutes without calls; one wake-up every 5 minutes is enough. */
     static final Duration WAKE_EVERY = Duration.ofMinutes(5);
+    /** After this time without answers the service may be asleep, so it is woken before a call. */
+    static final Duration AWAKE_FOR = Duration.ofMinutes(10);
 
     private final AiProperties properties;
     private final ObjectProvider<AiServiceAdapter> adapterProvider;
@@ -53,6 +58,7 @@ public class AiServiceProxy implements AiServiceClient {
     private final Map<UUID, Deque<Instant>> callsByProject = new HashMap<>();
     private final Map<UUID, Deque<Instant>> summariesByProject = new HashMap<>();
     private Instant lastWake;
+    private Instant lastAnswer;
     private AiServiceClient adapter;
 
     public AiServiceProxy(AiProperties properties, ObjectProvider<AiServiceAdapter> adapterProvider, Clock clock) {
@@ -91,7 +97,7 @@ public class AiServiceProxy implements AiServiceClient {
         Instant call = registerCall(callsByProject, request.projectId());
         BlueprintAnalysis analysis;
         try {
-            analysis = adapter().analyze(request);
+            analysis = callAwake(() -> adapter().analyze(request));
         } catch (AiServiceException ex) {
             // A failed analysis (for example, the model was busy) does not use up the limit.
             releaseCall(callsByProject, request.projectId(), call);
@@ -115,7 +121,7 @@ public class AiServiceProxy implements AiServiceClient {
         Instant call = registerCall(summariesByProject, request.projectId());
         ReportSummary summary;
         try {
-            summary = adapter().summarize(request);
+            summary = callAwake(() -> adapter().summarize(request));
         } catch (AiServiceException ex) {
             releaseCall(summariesByProject, request.projectId(), call);
             throw ex;
@@ -140,6 +146,39 @@ public class AiServiceProxy implements AiServiceClient {
         }
         lastWake = now;
         return true;
+    }
+
+    /**
+     * Makes a call to the service. If it has not answered for a while, it
+     * is woken first: the free plan of Render puts it to sleep, and a call
+     * sent while it starts can get an error page instead of an answer.
+     */
+    private <T> T callAwake(Supplier<T> call) {
+        if (!answeredSince(clock.instant().minus(AWAKE_FOR))) {
+            wakeAndWait();
+        }
+        T answer = call.get();
+        markAnswered();
+        return answer;
+    }
+
+    /** Asks for the health and waits for the answer; false when the service does not answer. */
+    private boolean wakeAndWait() {
+        try {
+            adapter().wake();
+        } catch (AiServiceException ex) {
+            return false;
+        }
+        markAnswered();
+        return true;
+    }
+
+    private synchronized boolean answeredSince(Instant moment) {
+        return lastAnswer != null && lastAnswer.isAfter(moment);
+    }
+
+    private synchronized void markAnswered() {
+        lastAnswer = clock.instant();
     }
 
     /** Counts the call, or refuses it when the project used all the calls of the window. */
