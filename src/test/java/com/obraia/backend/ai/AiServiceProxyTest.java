@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -24,6 +25,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 
@@ -221,6 +223,43 @@ class AiServiceProxyTest {
         proxy.wake();
 
         verify(adapter, times(2)).wake();
+    }
+
+    @Test
+    void aSleepingServiceIsWokenBeforeTheAnalysis() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 5, 10);
+
+        proxy.analyze(request("plano", 1));
+
+        InOrder order = inOrder(adapter);
+        order.verify(adapter).wake();
+        order.verify(adapter).analyze(any());
+    }
+
+    @Test
+    void theServiceIsNotWokenAgainWhileItKeepsAnswering() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 5, 10);
+
+        proxy.analyze(request("plano 1", 1));
+        clock.advance(Duration.ofMinutes(9));
+        proxy.analyze(request("plano 2", 1));
+        verify(adapter, times(1)).wake();
+
+        clock.advance(AiServiceProxy.AWAKE_FOR);
+        proxy.analyze(request("plano 3", 1));
+        verify(adapter, times(2)).wake();
+    }
+
+    @Test
+    void theSummaryAlsoWakesTheServiceFirst() {
+        when(adapter.summarize(any())).thenReturn(SUMMARY);
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 5, 10);
+
+        proxy.summarize(summaryRequest("es", 1));
+
+        InOrder order = inOrder(adapter);
+        order.verify(adapter).wake();
+        order.verify(adapter).summarize(any());
     }
 
     private SummaryRequest summaryRequest(String language, int progress) {
