@@ -2,6 +2,7 @@ package com.obraia.backend.ai;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -68,7 +69,7 @@ public class AiServiceAdapter implements AiServiceClient {
         } catch (RestClientResponseException ex) {
             throw failure(ex);
         } catch (ResourceAccessException ex) {
-            throw new AiServiceException("The AI service could not be reached or did not answer in time", ex);
+            throw notReached(ex);
         } catch (RestClientException ex) {
             throw new AiServiceException("The answer of the AI service could not be read", ex);
         }
@@ -92,7 +93,7 @@ public class AiServiceAdapter implements AiServiceClient {
         } catch (RestClientResponseException ex) {
             throw failure(ex);
         } catch (ResourceAccessException ex) {
-            throw new AiServiceException("The AI service could not be reached or did not answer in time", ex);
+            throw notReached(ex);
         } catch (RestClientException ex) {
             throw new AiServiceException("The answer of the AI service could not be read", ex);
         }
@@ -111,10 +112,26 @@ public class AiServiceAdapter implements AiServiceClient {
         }
     }
 
+    /**
+     * A connection that failed never reached obraia-ia. A call that waited
+     * too long may have reached the model, so it is not marked as unreached.
+     */
+    private static AiServiceException notReached(ResourceAccessException ex) {
+        String message = "The AI service could not be reached or did not answer in time";
+        if (ex.getCause() instanceof SocketTimeoutException) {
+            return new AiServiceException(message, ex);
+        }
+        return new AiServiceUnreachableException(message, ex);
+    }
+
     /** The error of obraia-ia, with its own message when it sent one. */
     private static AiServiceException failure(RestClientResponseException ex) {
         String message = "The AI service answered " + ex.getStatusCode().value();
         AiServiceError.Body error = errorBody(ex);
+        if (error == null && isGatewayError(ex.getStatusCode().value())) {
+            // Not the JSON of obraia-ia: the error page of Render while the service sleeps or starts.
+            return new AiServiceUnreachableException(message, ex);
+        }
         if (error != null && BUSY_CODE.equals(error.code())) {
             return new AiServiceBusyException(ex);
         }
@@ -122,6 +139,10 @@ public class AiServiceAdapter implements AiServiceClient {
             message += ": " + error.message();
         }
         return new AiServiceException(message, ex);
+    }
+
+    private static boolean isGatewayError(int status) {
+        return status == 502 || status == 503 || status == 504;
     }
 
     /** The error body, or null when it is not the JSON of obraia-ia (for example, a page of Render). */
