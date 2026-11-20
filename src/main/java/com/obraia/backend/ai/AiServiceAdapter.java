@@ -128,8 +128,8 @@ public class AiServiceAdapter implements AiServiceClient {
     private static AiServiceException failure(RestClientResponseException ex) {
         String message = "The AI service answered " + ex.getStatusCode().value();
         AiServiceError.Body error = errorBody(ex);
-        if (error == null && isGatewayError(ex.getStatusCode().value())) {
-            // Not the JSON of obraia-ia: the error page of Render while the service sleeps or starts.
+        if (error == null && isRenderError(ex.getStatusCode().value())) {
+            // Not the JSON of obraia-ia: the answer of Render while the service sleeps or starts.
             return new AiServiceUnreachableException(message, ex);
         }
         if (error != null && BUSY_CODE.equals(error.code())) {
@@ -141,8 +141,13 @@ public class AiServiceAdapter implements AiServiceClient {
         return new AiServiceException(message, ex);
     }
 
-    private static boolean isGatewayError(int status) {
-        return status == 502 || status == 503 || status == 504;
+    /**
+     * Statuses Render answers itself while obraia-ia sleeps or starts. A call
+     * from another Render service, like this backend, gets 429 and does not
+     * wake it; only a visit from outside Render does.
+     */
+    private static boolean isRenderError(int status) {
+        return status == 429 || status == 502 || status == 503 || status == 504;
     }
 
     /** The error body, or null when it is not the JSON of obraia-ia (for example, a page of Render). */
