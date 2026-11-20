@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -248,6 +249,42 @@ class AiServiceProxyTest {
         clock.advance(AiServiceProxy.AWAKE_FOR);
         proxy.analyze(request("plano 3", 1));
         verify(adapter, times(2)).wake();
+    }
+
+    @Test
+    void anAnalysisThatDidNotReachTheServiceIsTriedOnceMore() {
+        when(adapter.analyze(any())).thenThrow(new AiServiceUnreachableException("Render page", null))
+                .thenReturn(ANSWER);
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 1, 10);
+
+        BlueprintAnalysis analysis = proxy.analyze(request("plano", 1));
+
+        assertFalse(analysis.cached());
+        verify(adapter, times(2)).analyze(any());
+        verify(adapter, times(2)).wake();
+    }
+
+    @Test
+    void whenTheServiceDoesNotWakeUpTheAnalysisFailsWithoutUsingTheLimit() {
+        doThrow(new AiServiceException("asleep", null)).when(adapter).wake();
+        when(adapter.analyze(any())).thenThrow(new AiServiceUnreachableException("Render page", null))
+                .thenReturn(ANSWER);
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 1, 10);
+
+        assertThrows(AiServiceUnreachableException.class, () -> proxy.analyze(request("plano", 1)));
+        verify(adapter, times(1)).analyze(any());
+
+        proxy.analyze(request("plano", 1));
+    }
+
+    @Test
+    void otherFailuresAreNotTriedAgain() {
+        when(adapter.analyze(any())).thenThrow(new AiServiceException("Gemini answered 400", null));
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 5, 10);
+
+        assertThrows(AiServiceException.class, () -> proxy.analyze(request("plano", 1)));
+
+        verify(adapter, times(1)).analyze(any());
     }
 
     @Test
