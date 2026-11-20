@@ -299,6 +299,27 @@ class AiServiceProxyTest {
         order.verify(adapter).summarize(any());
     }
 
+    @Test
+    void noWakeUpIsSentRightAfterAnAnswer() {
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 5, 10);
+        proxy.analyze(request("plano", 1));
+
+        proxy.wake();
+
+        verify(adapter, times(1)).wake();
+    }
+
+    @Test
+    void aWakeUpThatFailedCanBeTriedAgainRightAway() {
+        doThrow(new AiServiceException("asleep", null)).doNothing().when(adapter).wake();
+        AiServiceProxy proxy = proxy("https://obraia-ia.test", 5, 10);
+
+        assertThrows(AiServiceException.class, proxy::wake);
+        proxy.wake();
+
+        verify(adapter, times(2)).wake();
+    }
+
     private SummaryRequest summaryRequest(String language, int progress) {
         return new SummaryRequest(projectId, language, "public", Map.of("work", Map.of("progress_pct", progress)));
     }
