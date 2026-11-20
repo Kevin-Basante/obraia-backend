@@ -50,7 +50,8 @@ public class BlueprintAnalysisController {
     @ApiResponse(responseCode = "502", description = "The AI service failed; the blueprint is marked as failed",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "503", description = "The AI service is not configured (AI_SERVICE_DISABLED), "
-            + "or its model is busy and the analysis can be tried again later (AI_SERVICE_BUSY)",
+            + "its model is busy and the analysis can be tried again later (AI_SERVICE_BUSY), "
+            + "or it is still waking up and can be tried again in a minute (AI_SERVICE_WAKING)",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     public BlueprintAnalysisResponse analyze(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId,
             @PathVariable UUID blueprintId) {
