@@ -24,6 +24,7 @@ import com.obraia.backend.ai.AiLimitReachedException;
 import com.obraia.backend.ai.AiServiceBusyException;
 import com.obraia.backend.ai.AiServiceDisabledException;
 import com.obraia.backend.ai.AiServiceException;
+import com.obraia.backend.ai.AiServiceUnreachableException;
 import com.obraia.backend.dto.blueprint.BlueprintAnalysisResponse;
 import com.obraia.backend.dto.project.StatusResponse;
 import com.obraia.backend.exception.GlobalExceptionHandler;
@@ -77,6 +78,16 @@ class BlueprintAnalysisControllerTest {
         mvc.perform(post("/api/projects/{id}/blueprints/{blueprintId}/analyze", projectId, blueprintId))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.error.code").value("AI_SERVICE_FAILED"));
+    }
+
+    @Test
+    void aSleepingAiAnswers503() throws Exception {
+        when(analysisService.analyze(projectId, userId, blueprintId))
+                .thenThrow(new AiServiceUnreachableException("The AI service answered 429", null));
+
+        mvc.perform(post("/api/projects/{id}/blueprints/{blueprintId}/analyze", projectId, blueprintId))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error.code").value("AI_SERVICE_WAKING"));
     }
 
     @Test
