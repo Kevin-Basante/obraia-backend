@@ -28,7 +28,8 @@ public class AiController {
     @GetMapping("/wake")
     @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
     @Operation(summary = "Wake the AI service in the background; it answers at once")
-    @ApiResponse(responseCode = "200", description = "enabled is false when the AI service is not configured")
+    @ApiResponse(responseCode = "200", description = "enabled is false when the AI service is not configured; "
+            + "url is the health check the browser visits, because Render only wakes the service for outside calls")
     public AiWakeResponse wake() {
         return wakeService.wake();
     }
